@@ -33,6 +33,10 @@ class EpisodeMetadata(BaseModel):
     show_title: str = Field(..., description="Title of the podcast / series / channel")
     episode_title: str = Field(..., description="Title of the specific episode")
     episode_id: str = Field(..., description="Unique episode identifier or enclosure hash/guid")
+    episode_number: int | None = Field(
+        default=None,
+        description="Declared episode number from the feed (e.g. itunes:episode), if present",
+    )
     show_id: str | None = Field(default=None, description="Optional show identifier or slug")
     audio_url: str | None = Field(default=None, description="Direct audio enclosure URL")
     duration_seconds: float | None = Field(default=None, description="Duration in seconds")

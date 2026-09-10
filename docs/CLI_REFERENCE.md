@@ -88,9 +88,12 @@ podcast-ctl transcribe <input_source> [OPTIONS]
 
 #### Options
 * `--episode`, `-e` *(string, default: None)*: Target episode by:
-  * 1-based index (e.g. `-e 1` for most recent episode)
+  * Episode number (e.g. `-e 2894` selects the episode numbered 2894). Numeric filters match the feed-declared number (`itunes:episode`) first, then a leading number in the title (e.g. `2894. Title` or `#2894 - Title`).
+  * 1-based positional index in feed order, newest first (e.g. `-e 1` for the most recent episode). Used only when no episode number matches.
   * Exact Episode ID / GUID (e.g. `-e 12345-abcde`)
   * Case-insensitive title substring (e.g. `-e "Sam Altman"`)
+
+  The selected episode(s) - number, title, ID and publication date - are always shown before the confirmation prompt.
 * `--latest`, `-l` *(int, default: 1)*: Transcribe latest N episodes (applied if `--all` or `--episode` is not specified).
 * `--all`, `-a` *(bool, default: False)*: Transcribe all available episodes in the feed.
 * `--engine` *(string, default: "auto")*: Transcription engine strategy (`auto`, `rss`, `youtube`, `whisper`, `groq`, `openai`).
