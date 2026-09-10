@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from typing import Annotated, Optional
 import questionary
 from rich.table import Table
 import typer
@@ -57,18 +57,22 @@ def cache_stats() -> None:
 
 @cache_app.command("list")
 def cache_list(
-    show: Optional[str] = typer.Option(
-        None,
-        "--show",
-        "-s",
-        help="Filter cached transcripts by show ID or title",
-    ),
-    limit: int = typer.Option(
-        25,
-        "--limit",
-        "-n",
-        help="Maximum number of cached transcripts to list",
-    ),
+    show: Annotated[
+        Optional[str],
+        typer.Option(
+            "--show",
+            "-s",
+            help="Filter cached transcripts by show ID or title",
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            "-n",
+            help="Maximum number of cached transcripts to list",
+        ),
+    ] = 25,
 ) -> None:
     """List transcripts currently stored in the local SQLite cache."""
     repo = StorageRepository()
@@ -118,18 +122,22 @@ def cache_list(
 
 @cache_app.command("clean")
 def cache_clean(
-    show: Optional[str] = typer.Option(
-        None,
-        "--show",
-        "-s",
-        help="Clear cache only for a specific show ID",
-    ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Skip interactive confirmation prompt",
-    ),
+    show: Annotated[
+        Optional[str],
+        typer.Option(
+            "--show",
+            "-s",
+            help="Clear cache only for a specific show ID",
+        ),
+    ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip interactive confirmation prompt",
+        ),
+    ] = False,
 ) -> None:
     """Clear cached transcripts from the local SQLite database."""
     target_desc = f"all cached transcripts for show '{show}'" if show else "ALL cached transcripts"

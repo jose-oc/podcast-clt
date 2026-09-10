@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 import typer
 
 from podcast_cli.discovery.resolver import resolve_input
@@ -62,66 +62,88 @@ def _select_episodes(
 
 
 def transcribe_command(
-    input_source: str = typer.Argument(
-        ...,
-        help="Podcast RSS feed URL, Apple Podcasts search term, YouTube URL, or local audio file",
-    ),
-    episode: Optional[str] = typer.Option(
-        None,
-        "--episode",
-        "-e",
-        help="Specific episode to transcribe by 1-based index, episode ID/GUID, or title substring",
-    ),
-    all_episodes: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="Transcribe all available episodes in the feed",
-    ),
-    latest: int = typer.Option(
-        1,
-        "--latest",
-        "-l",
-        help="Transcribe the latest N episodes (default: 1)",
-    ),
-    engine: str = typer.Option(
-        "auto",
-        "--engine",
-        help="Transcription engine tier: 'auto', 'rss', 'youtube', 'whisper', 'groq', 'openai'",
-    ),
-    model_size: str = typer.Option(
-        "base",
-        "--model-size",
-        help="Whisper model size: 'tiny', 'base', 'small', 'medium', 'large-v3'",
-    ),
-    format: str = typer.Option(
-        "both",
-        "--format",
-        "-f",
-        help="Export format(s): 'both', 'markdown', 'prose', 'srt', 'vtt', 'json', 'all'",
-    ),
-    output_dir: Path = typer.Option(
-        Path("./transcripts"),
-        "--output-dir",
-        "-o",
-        help="Output directory path for transcript files",
-    ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Auto-confirm pre-flight inspection and interactive prompts",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        help="Force re-transcription even if cached transcript exists",
-    ),
-    keep_audio: bool = typer.Option(
-        False,
-        "--keep-audio",
-        help="Retain downloaded audio files in cache directory after transcription",
-    ),
+    input_source: Annotated[
+        str,
+        typer.Argument(
+            help="Podcast RSS feed URL, Apple Podcasts search term, YouTube URL, or local audio file",
+        ),
+    ],
+    episode: Annotated[
+        Optional[str],
+        typer.Option(
+            "--episode",
+            "-e",
+            help="Specific episode to transcribe by 1-based index, episode ID/GUID, or title substring",
+        ),
+    ] = None,
+    all_episodes: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help="Transcribe all available episodes in the feed",
+        ),
+    ] = False,
+    latest: Annotated[
+        int,
+        typer.Option(
+            "--latest",
+            "-l",
+            help="Transcribe the latest N episodes (default: 1)",
+        ),
+    ] = 1,
+    engine: Annotated[
+        str,
+        typer.Option(
+            "--engine",
+            help="Transcription engine tier: 'auto', 'rss', 'youtube', 'whisper', 'groq', 'openai'",
+        ),
+    ] = "auto",
+    model_size: Annotated[
+        str,
+        typer.Option(
+            "--model-size",
+            help="Whisper model size: 'tiny', 'base', 'small', 'medium', 'large-v3'",
+        ),
+    ] = "base",
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Export format(s): 'both', 'markdown', 'prose', 'srt', 'vtt', 'json', 'all'",
+        ),
+    ] = "both",
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Output directory path for transcript files",
+        ),
+    ] = Path("./transcripts"),
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Auto-confirm pre-flight inspection and interactive prompts",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Force re-transcription even if cached transcript exists",
+        ),
+    ] = False,
+    keep_audio: Annotated[
+        bool,
+        typer.Option(
+            "--keep-audio",
+            help="Retain downloaded audio files in cache directory after transcription",
+        ),
+    ] = False,
 ) -> None:
     """Transcribe podcast episodes, YouTube videos, or local audio files with multi-tier fallback."""
     # 1. Resolve input source

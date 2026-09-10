@@ -167,6 +167,53 @@ def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) ->
         assert "https://talkpython.fm/rss" in captured.out
 
 
+def test_search_command_interactive_action_inspect() -> None:
+    """Test interactive search selecting 'Inspect Show & Episodes' action."""
+    from podcast_cli.cli.commands.search import search_command
+    import sys
+
+    mock_item = PodcastSearchResult(
+        collection_id=123,
+        title="Talk Python To Me",
+        author="Michael Kennedy",
+        feed_url="https://talkpython.fm/rss",
+        episode_count=450,
+    )
+    with (
+        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch.object(sys.stdin, "isatty", return_value=True),
+        patch("questionary.select") as mock_select,
+        patch("podcast_cli.cli.commands.inspect.inspect_command") as mock_inspect,
+    ):
+        mock_select.return_value.ask.side_effect = [mock_item, "inspect"]
+        search_command(query="Python", interactive=True)
+        mock_inspect.assert_called_once_with(input_source="https://talkpython.fm/rss")
+
+
+def test_search_command_interactive_action_transcribe() -> None:
+    """Test interactive search selecting 'Transcribe Latest Episode' action."""
+    from podcast_cli.cli.commands.search import search_command
+    import sys
+
+    mock_item = PodcastSearchResult(
+        collection_id=123,
+        title="Talk Python To Me",
+        author="Michael Kennedy",
+        feed_url="https://talkpython.fm/rss",
+        episode_count=450,
+    )
+    with (
+        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch.object(sys.stdin, "isatty", return_value=True),
+        patch("questionary.select") as mock_select,
+        patch("podcast_cli.cli.commands.transcribe.transcribe_command") as mock_transcribe,
+    ):
+        mock_select.return_value.ask.side_effect = [mock_item, "transcribe"]
+        search_command(query="Python", interactive=True)
+        mock_transcribe.assert_called_once_with(input_source="https://talkpython.fm/rss", latest=1)
+
+
+
 # =============================================================================
 # Inspect Command Tests
 # =============================================================================

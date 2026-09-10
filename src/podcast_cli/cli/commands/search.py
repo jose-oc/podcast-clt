@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from typing import Annotated, Optional
 import questionary
 from rich.table import Table
 import typer
@@ -13,13 +13,15 @@ from podcast_cli.ui.console import console
 
 
 def search_command(
-    query: str = typer.Argument(..., help="Search query (podcast title, topic, or host name)"),
-    limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of search results to display"),
-    interactive: bool = typer.Option(
-        True,
-        "--interactive/--no-interactive",
-        help="Enable interactive selection prompt after search results",
-    ),
+    query: Annotated[str, typer.Argument(help="Search query (podcast title, topic, or host name)")],
+    limit: Annotated[int, typer.Option("--limit", "-n", help="Maximum number of search results to display")] = 10,
+    interactive: Annotated[
+        bool,
+        typer.Option(
+            "--interactive/--no-interactive",
+            help="Enable interactive selection prompt after search results",
+        ),
+    ] = True,
 ) -> None:
     """Search Apple Podcasts / iTunes directory for shows and feeds."""
     with console.status_spinner(f"Searching Apple Podcasts for '[bold white]{query}[/bold white]'..."):

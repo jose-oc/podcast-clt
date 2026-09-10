@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Annotated, Optional
 from rich.table import Table
 import typer
 
@@ -31,12 +31,14 @@ mapping_app.add_typer(mapping_remove_app, name="remove")
 
 @mapping_app.command("list")
 def list_mappings(
-    show: Optional[str] = typer.Option(
-        None,
-        "--show",
-        "-s",
-        help="Filter mappings by specific show ID or feed URL",
-    ),
+    show: Annotated[
+        Optional[str],
+        typer.Option(
+            "--show",
+            "-s",
+            help="Filter mappings by specific show ID or feed URL",
+        ),
+    ] = None,
 ) -> None:
     """List all stored Show and Episode YouTube mappings."""
     repo = StorageRepository()
@@ -87,9 +89,9 @@ def list_mappings(
 
 @mapping_add_app.command("show")
 def add_show_mapping(
-    feed_url: str = typer.Argument(..., help="Podcast RSS feed URL"),
-    youtube_channel_url: str = typer.Argument(..., help="Associated YouTube channel URL"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Optional show title"),
+    feed_url: Annotated[str, typer.Argument(help="Podcast RSS feed URL")],
+    youtube_channel_url: Annotated[str, typer.Argument(help="Associated YouTube channel URL")],
+    title: Annotated[Optional[str], typer.Option("--title", "-t", help="Optional show title")] = None,
 ) -> None:
     """Add or update a Show <-> YouTube Channel mapping."""
     repo = StorageRepository()

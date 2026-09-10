@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from rich.panel import Panel
 from rich.table import Table
 import typer
@@ -26,21 +27,27 @@ def _format_seconds(seconds: float | None) -> str:
 
 
 def inspect_command(
-    input_source: str = typer.Argument(
-        ...,
-        help="Input source: RSS URL, show title / search term, YouTube URL, or local audio file",
-    ),
-    engine: str = typer.Option(
-        "auto",
-        "--engine",
-        help="Preferred transcription engine ('auto', 'rss', 'youtube', 'whisper', 'groq', 'openai')",
-    ),
-    limit: int = typer.Option(
-        20,
-        "--limit",
-        "-n",
-        help="Maximum number of individual episodes to show in detailed table",
-    ),
+    input_source: Annotated[
+        str,
+        typer.Argument(
+            help="Input source: RSS URL, show title / search term, YouTube URL, or local audio file",
+        ),
+    ],
+    engine: Annotated[
+        str,
+        typer.Option(
+            "--engine",
+            help="Preferred transcription engine ('auto', 'rss', 'youtube', 'whisper', 'groq', 'openai')",
+        ),
+    ] = "auto",
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            "-n",
+            help="Maximum number of individual episodes to show in detailed table",
+        ),
+    ] = 20,
 ) -> None:
     """Inspect a podcast feed, show, YouTube link, or audio file and display pre-flight analysis."""
     with console.status_spinner(f"Resolving input source '[bold white]{input_source}[/bold white]'..."):
