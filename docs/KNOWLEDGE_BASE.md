@@ -2,10 +2,10 @@
 
 The knowledge base (KB) turns your cached transcripts into a browsable,
 searchable, LLM-ready corpus. It implements phases **2a** (derived per-episode
-Markdown + catalog) and **2b** (chunk index + FTS5 lexical search) of
-[KNOWLEDGE_BASE_DESIGN.md](KNOWLEDGE_BASE_DESIGN.md). Vector embeddings with
-local models (2c) and the evaluation harness (2d) come next; the index schema
-already reserves the metadata both need.
+Markdown + catalog), **2b** (chunk index + FTS5 lexical search), and **2c**
+(local embeddings + hybrid lexical/vector search) of
+[KNOWLEDGE_BASE_DESIGN.md](KNOWLEDGE_BASE_DESIGN.md). The evaluation harness
+(2d) comes next; the index schema already records the provenance it needs.
 
 ## Layout
 
@@ -17,7 +17,7 @@ kb/
   raw/<show>/<episode>.json        # write-once snapshot of the source transcript
   episodes/<show>/<episode>.md     # derived per-episode Markdown document
   INDEX.md                         # browsable catalog (regenerated on every build)
-  db/kb.sqlite                     # chunk index + FTS5 (separate from the catalog DB)
+  db/kb.sqlite                     # chunk index + FTS5 + embeddings (separate from the catalog DB)
 ```
 
 - **Raw is the source of truth.** `raw/` snapshots are content-hashed and
@@ -37,6 +37,9 @@ podcast-ctl kb build
 # Build only one show
 podcast-ctl kb build --show "Monos Estocásticos"
 
+# Embed chunks for vector/hybrid search (local model, runs on your machine)
+podcast-ctl kb embed
+
 # Search: table with [Episode @ mm:ss] citations and highlighted snippets
 podcast-ctl kb search "búsqueda semántica"
 
@@ -50,9 +53,64 @@ podcast-ctl kb search "búsqueda semántica" --json --limit 5
 podcast-ctl kb status
 ```
 
-Search is lexical (SQLite FTS5, BM25 ranking), case- and
-diacritics-insensitive (`busqueda` matches `búsqueda`). Terms are ANDed
-first; if nothing matches, the search retries with OR for recall.
+Search defaults to `--mode auto`: hybrid retrieval once embeddings exist,
+plain lexical before that. Force a mode with `--mode lexical|vector|hybrid`.
+
+- **lexical**: SQLite FTS5, BM25 ranking, case- and diacritics-insensitive
+  (`busqueda` matches `búsqueda`). Terms are ANDed first; if nothing
+  matches, the search retries with OR for recall.
+- **vector**: cosine similarity over chunk embeddings — paraphrase and
+  concept queries that lexical search misses.
+- **hybrid**: Reciprocal Rank Fusion (k=60) over both ranked lists, which
+  outperforms either alone. The table adds a Sources column showing which
+  retriever(s) ranked each hit.
+
+## Embeddings and hybrid search (phase 2c)
+
+`kb embed` derives one vector per chunk so vector and hybrid search work.
+Like `kb build`, it is incremental and idempotent: only chunks without an
+embedding are processed, and re-running it after `kb build` picks up exactly
+the chunks a rebuild replaced.
+
+```bash
+# Local embeddings (default). First install pulls the optional extra:
+#   pip install 'podcast-ctl[embeddings]'
+podcast-ctl kb embed
+
+# Different local model
+podcast-ctl kb embed --model intfloat/multilingual-e5-base --reindex
+
+# Optional cloud adapter: any OpenAI-compatible embeddings endpoint,
+# configured entirely through environment variables (no vendor coupling)
+export PODCAST_CTL_EMBED_BASE_URL="https://api.example.com/v1"
+export PODCAST_CTL_EMBED_API_KEY="..."
+export PODCAST_CTL_EMBED_MODEL="text-embedding-x"
+podcast-ctl kb embed --provider openai-compatible --reindex
+```
+
+Provider independence is enforced, not aspirational:
+
+- **Local by default.** The default backend is sentence-transformers with
+  `BAAI/bge-m3` (strong multilingual retrieval, including Spanish). No
+  per-query cost; transcripts never leave your machine.
+- **Cloud only as an adapter.** The `openai-compatible` provider is a thin
+  HTTP adapter over `httpx` (already a dependency) configured via env vars —
+  point it at OpenAI, a compatible gateway, or a self-hosted server. Nothing
+  in the KB depends on a specific vendor.
+- **Recorded provenance.** Every vector stores the model name, backend
+  version, and dimensions that produced it; the index also records the
+  provider identity (`provider:model@version`) in `kb_meta`.
+- **Detectable reindex.** Searching or embedding with a provider that does
+  not match the indexed identity refuses to mix incompatible vectors:
+  `kb embed --reindex` drops the old vectors and rebuilds from the unchanged
+  raw snapshots and chunks — a reproducible reindex. (`kb search --mode auto`
+  degrades to lexical with a warning instead of failing.)
+- **Portable storage.** Vectors live as float32 BLOBs in `kb.sqlite` and are
+  compared with an in-process cosine over unit-normalized vectors — no
+  native SQLite extension to load, so the index file stays portable across
+  machines. At KB scale the scan is milliseconds; adopting an ANN extension
+  (e.g. sqlite-vec) later would be a pure performance change that reuses the
+  same stored vectors.
 
 ## End-to-end example: podcast → transcript → KB → LLM answer
 
@@ -194,11 +252,10 @@ model (requires `ollama serve` running and the model pulled).
   chunk IDs across rebuilds.
 - Every chunk records show/episode, chapter, start/end timestamps, and the
   raw segment range it came from — full traceability back to the raw audio.
-- The `embeddings` table (reserved for phase 2c) stores model name, model
-  version, and dimensions per vector, so a future provider or model switch
-  triggers a clean, detectable reindex instead of silently mixing
-  incompatible vectors. Local embeddings will be the default; hosted APIs
-  will only ever be optional adapters.
+- The `embeddings` table stores model name, backend version, and
+  dimensions per vector, and `kb_meta` records the provider identity — a
+  provider or model switch triggers a clean, detectable reindex instead of
+  silently mixing incompatible vectors (see "Embeddings and hybrid search").
 
 ## Configuration
 
@@ -206,3 +263,6 @@ model (requires `ollama serve` running and the model pulled).
 | :--- | :--- | :--- |
 | `PODCAST_CTL_KB_DIR` | Knowledge base root directory. | `kb/` next to the catalog DB, or `~/.local/share/podcast-ctl/kb` |
 | `PODCAST_CTL_DB_PATH` | Catalog DB the KB reads transcripts from. | `~/.local/share/podcast-ctl/podcast_ctl.db` |
+| `PODCAST_CTL_EMBED_MODEL` | Embedding model for the local provider, or the model name the cloud adapter sends. | `BAAI/bge-m3` |
+| `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API (cloud adapter). | — |
+| `PODCAST_CTL_EMBED_API_KEY` | API key for the cloud adapter. | — |

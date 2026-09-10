@@ -19,7 +19,7 @@ Fast, modular CLI to discover, inspect, and transcribe podcast episodes, YouTube
 - 🛡️ **Gatekeeper & Workload Estimator**: Inspect feeds before running, preview total duration, estimated disk usage, and auto-resolved tiers.
 - 🧠 **Persistent Knowledge Learning**: Learns and remembers confirmed Show $\leftrightarrow$ YouTube Channel mappings and episode associations in a local SQLite database (WAL mode).
 - 📦 **Multi-Format Exporters**: Output to styled **Markdown** with YAML frontmatter, clean readable **Prose**, **SubRip (.srt)**, **WebVTT (.vtt)**, and structured **JSON**.
-- 🧾 **Knowledge Base (Phase 2)**: Derives per-episode Markdown + `INDEX.md` from cached transcripts, and a chunked FTS5 search index (`kb.sqlite`) with stable IDs and `[Episode @ mm:ss]` citations — provider-agnostic and LLM-ready (local Ollama, any cloud chat, NotebookLM, or a desktop AI agent driving the CLI itself — see [AGENTS.md](AGENTS.md)).
+- 🧾 **Knowledge Base (Phase 2)**: Derives per-episode Markdown + `INDEX.md` from cached transcripts, and a chunked search index (`kb.sqlite`) with stable IDs and `[Episode @ mm:ss]` citations — FTS5 lexical search plus local embeddings and hybrid (RRF) retrieval, provider-agnostic and LLM-ready (local Ollama, any cloud chat, NotebookLM, or a desktop AI agent driving the CLI itself — see [AGENTS.md](AGENTS.md)).
 - 🎨 **Rich Terminal UI**: Vibrant tables, progress spinners, interactive selection menus, and clear visual hierarchy.
 
 ---
@@ -112,7 +112,7 @@ podcast-ctl transcribe ./meeting.m4a -o ./transcripts --format all
 | `transcribe` | `podcast-ctl transcribe <input>` | Transcribe episodes with multi-tier fallback and multi-format export. |
 | `mapping` | `podcast-ctl mapping [list\|add\|remove]` | Manage learned Show $\leftrightarrow$ YouTube associations. |
 | `cache` | `podcast-ctl cache [stats\|list\|clean]` | Inspect and manage SQLite database and transcript cache. |
-| `kb` | `podcast-ctl kb [build\|search\|status]` | Build and query the knowledge base derived from cached transcripts. |
+| `kb` | `podcast-ctl kb [build\|embed\|search\|status]` | Build and query the knowledge base derived from cached transcripts. |
 
 For detailed documentation on flags, options, and advanced configurations, see the [CLI Reference](docs/CLI_REFERENCE.md).
 

@@ -1,15 +1,23 @@
 """SQLite storage for the knowledge base index (separate from the catalog DB).
 
 ``kb.sqlite`` holds the episode manifest, the chunk table, an FTS5 lexical
-index (BM25) kept in sync by triggers, and an ``embeddings`` table reserved
-for the vector phase (2c). Every derived row records the pipeline version and
-model metadata that produced it, so the index can be rebuilt cleanly when the
-pipeline or the embedding provider changes.
+index (BM25) kept in sync by triggers, and an ``embeddings`` table with one
+unit-normalized vector per chunk (phase 2c). Every derived row records the
+pipeline version and model metadata that produced it, so the index can be
+rebuilt cleanly when the pipeline or the embedding provider changes.
+
+Vectors are stored as float32 BLOBs and compared with an in-process cosine
+(dot product over unit vectors) instead of a native SQLite extension: the
+index stays portable (no extension loading, no architecture-specific
+binaries), and KB-scale corpora scan in milliseconds. A native ANN index
+(sqlite-vec or similar) can be adopted later as a pure performance change;
+the stored vectors and their provenance metadata would not need rebuilding.
 """
 
 from __future__ import annotations
 
 import sqlite3
+import struct
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -85,9 +93,9 @@ CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
     VALUES (new.rowid, new.text, new.show_title, new.episode_title, new.chapter);
 END;
 
--- Reserved for the vector phase (2c): one embedding per chunk, always tagged
--- with the model that produced it so a provider switch triggers a detectable
--- reindex instead of silently mixing incompatible vectors.
+-- One embedding per chunk, always tagged with the model that produced it so
+-- a provider switch triggers a detectable reindex instead of silently mixing
+-- incompatible vectors. Vectors are float32 little-endian BLOBs, unit-norm.
 CREATE TABLE IF NOT EXISTS embeddings (
     chunk_id TEXT PRIMARY KEY REFERENCES chunks(chunk_id) ON DELETE CASCADE,
     model TEXT NOT NULL,
@@ -107,6 +115,17 @@ def _query_terms(raw_query: str) -> list[str]:
         if cleaned:
             terms.append(cleaned)
     return terms
+
+
+def pack_vector(vector: list[float]) -> bytes:
+    """Serialize a float vector as little-endian float32 bytes."""
+    return struct.pack(f"<{len(vector)}f", *vector)
+
+
+def unpack_vector(blob: bytes) -> list[float]:
+    """Deserialize little-endian float32 bytes into a float vector."""
+    dims = len(blob) // 4
+    return list(struct.unpack(f"<{dims}f", blob))
 
 
 class KbStore:
@@ -245,6 +264,143 @@ class KbStore:
             chunks = conn.execute("SELECT COUNT(*) AS n FROM chunks").fetchone()["n"]
             vectors = conn.execute("SELECT COUNT(*) AS n FROM embeddings").fetchone()["n"]
         return {"episodes": int(episodes), "chunks": int(chunks), "embeddings": int(vectors)}
+
+    def count_chunks(self, show_id: str | None = None) -> int:
+        """Count indexed chunks, optionally scoped to one show."""
+        sql = "SELECT COUNT(*) AS n FROM chunks"
+        params: list[object] = []
+        if show_id is not None:
+            sql += " WHERE show_id = ?"
+            params.append(show_id)
+        with self.connection() as conn:
+            row = conn.execute(sql, params).fetchone()
+        return int(row["n"])
+
+    # ------------------------------------------------------------------
+    # KB metadata (provenance key/value store)
+    # ------------------------------------------------------------------
+
+    def get_meta(self, key: str) -> str | None:
+        """Return a kb_meta value, or None when unset."""
+        with self.connection() as conn:
+            row = conn.execute("SELECT value FROM kb_meta WHERE key = ?", (key,)).fetchone()
+        return str(row["value"]) if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        """Upsert a kb_meta value."""
+        with self.connection() as conn:
+            conn.execute(
+                "INSERT INTO kb_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+
+    # ------------------------------------------------------------------
+    # Embeddings (vector phase 2c)
+    # ------------------------------------------------------------------
+
+    def embedding_identity(self) -> str | None:
+        """Identity (provider:model@version) of the vectors in the index."""
+        return self.get_meta("embedding_identity")
+
+    def delete_embeddings(self) -> int:
+        """Drop every stored embedding (full reindex). Returns the count."""
+        with self.connection() as conn:
+            count = conn.execute("SELECT COUNT(*) AS n FROM embeddings").fetchone()["n"]
+            conn.execute("DELETE FROM embeddings")
+            conn.execute("DELETE FROM kb_meta WHERE key IN ('embedding_identity', 'embedding_dims')")
+        return int(count)
+
+    def chunks_missing_embeddings(self, show_id: str | None = None) -> list[dict[str, object]]:
+        """Return chunks that have no embedding row yet (id and text only)."""
+        sql = """
+            SELECT c.chunk_id, c.text
+            FROM chunks c
+            LEFT JOIN embeddings e ON e.chunk_id = c.chunk_id
+            WHERE e.chunk_id IS NULL
+        """
+        params: list[object] = []
+        if show_id is not None:
+            sql += " AND c.show_id = ?"
+            params.append(show_id)
+        sql += " ORDER BY c.show_id, c.episode_id, c.position"
+        with self.connection() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_embeddings(
+        self,
+        rows: list[tuple[str, str, str, int, bytes]],
+        identity: str,
+    ) -> None:
+        """Insert or replace embedding rows and record the provider identity.
+
+        Each row is ``(chunk_id, model, model_version, dims, vector_blob)``;
+        vectors must already be unit-normalized so cosine is a dot product.
+        """
+        if not rows:
+            return
+        with self.connection() as conn:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO embeddings (chunk_id, model, model_version, dims, vector, created_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                rows,
+            )
+            conn.execute(
+                "INSERT INTO kb_meta (key, value) VALUES ('embedding_identity', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (identity,),
+            )
+            conn.execute(
+                "INSERT INTO kb_meta (key, value) VALUES ('embedding_dims', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (str(rows[0][3]),),
+            )
+
+    def vector_search(
+        self,
+        query_vector: list[float],
+        limit: int = 10,
+        show_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        """Rank chunks by cosine similarity against a unit-norm query vector.
+
+        In-process scan over float32 BLOBs (dot product, since every stored
+        vector is unit-normalized). Rows whose dimensionality differs from
+        the query vector are skipped — they belong to an incompatible model.
+        Each hit carries ``cosine`` (higher is better) in ``rank``.
+        """
+        sql = """
+            SELECT c.chunk_id, c.show_id, c.episode_id, c.show_title, c.episode_title,
+                   c.chapter, c.position, c.start_s, c.end_s, c.text,
+                   e.dims, e.vector
+            FROM embeddings e
+            JOIN chunks c ON c.chunk_id = e.chunk_id
+        """
+        params: list[object] = []
+        if show_id is not None:
+            sql += " WHERE c.show_id = ?"
+            params.append(show_id)
+
+        query_dims = len(query_vector)
+        scored: list[tuple[float, dict[str, object]]] = []
+        with self.connection() as conn:
+            for row in conn.execute(sql, params):
+                if int(row["dims"]) != query_dims:
+                    continue
+                candidate = unpack_vector(row["vector"])
+                score = sum(q * v for q, v in zip(query_vector, candidate, strict=True))
+                hit = {key: row[key] for key in row.keys() if key not in ("dims", "vector")}
+                scored.append((score, hit))
+
+        scored.sort(key=lambda item: (-item[0], str(item[1]["chunk_id"])))
+        hits = []
+        for score, hit in scored[:limit]:
+            hit["rank"] = score
+            hit["cosine"] = score
+            hits.append(hit)
+        return hits
 
     # ------------------------------------------------------------------
     # Lexical search (FTS5 / BM25)
