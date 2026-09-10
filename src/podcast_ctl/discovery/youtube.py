@@ -72,7 +72,8 @@ def extract_youtube_video_id(url_or_id: str) -> str | None:
             return None
 
         # youtu.be/VIDEO_ID
-        if "youtu.be" in netloc:
+        hostname = parsed.hostname or ""
+        if hostname == "youtu.be" or hostname.endswith(".youtu.be"):
             path_part = parsed.path.strip("/")
             if path_part:
                 vid = path_part.split("/")[0].split("?")[0]
