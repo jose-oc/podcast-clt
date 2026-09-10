@@ -8,6 +8,44 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Install dev dependencies
+        run: uv sync --only-group dev
+
+      - name: Run ruff
+        run: uv run ruff check .
+
+  typecheck:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Install dev dependencies
+        run: uv sync --only-group dev
+
+      - name: Run mypy
+        run: uv run mypy
+
   test:
     name: Run Pytest (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -32,6 +70,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --all-groups --python ${{ matrix.python-version }}
 
-      - name: Run test suite
-        run: uv run --python ${{ matrix.python-version }} pytest -v
+      - name: Run unit test suite
+        run: uv run --python ${{ matrix.python-version }} pytest -v -m "not integration"
 
+  integration:
+    name: Integration tests (real feeds & YouTube)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      # No extras on purpose: integration tests cover RSS + YouTube tiers,
+      # which must not require the optional faster-whisper dependency.
+      - name: Install dependencies
+        run: uv sync --python 3.13
+
+      # Network tests: they skip (not fail) on transient errors and on
+      # YouTube datacenter-IP blocks, which are expected on CI runners.
+      - name: Run integration tests
+        run: uv run --python 3.13 pytest -v -m integration

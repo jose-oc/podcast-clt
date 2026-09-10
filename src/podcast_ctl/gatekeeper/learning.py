@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from podcast_ctl.models.knowledge import EpisodeMapping, ShowMapping
 from podcast_ctl.storage.repository import StorageRepository
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 class KnowledgeLearner:
     """Manages persistent knowledge updates for YouTube mappings and user cloud preferences."""
 
-    def __init__(self, repository: Optional[StorageRepository] = None) -> None:
+    def __init__(self, repository: StorageRepository | None = None) -> None:
         self.repository = repository
 
     @classmethod
@@ -24,8 +23,8 @@ class KnowledgeLearner:
         show_id: str,
         episode_id: str,
         youtube_url: str,
-        show_title: Optional[str] = None,
-        channel_url: Optional[str] = None,
+        show_title: str | None = None,
+        channel_url: str | None = None,
     ) -> EpisodeMapping:
         """Persist a confirmed YouTube video mapping for an episode and optionally update show mapping.
 
@@ -103,7 +102,7 @@ class KnowledgeLearner:
         repository: StorageRepository,
         show_id: str,
         episode_id: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Retrieve confirmed YouTube video URL mapping if previously stored."""
         mapping = repository.get_episode_mapping(show_id, episode_id)
         if mapping and mapping.youtube_video_url:
@@ -115,7 +114,7 @@ class KnowledgeLearner:
         cls,
         repository: StorageRepository,
         show_id: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Retrieve confirmed YouTube channel URL if previously stored."""
         mapping = repository.get_show_mapping(show_id)
         if mapping and mapping.youtube_channel_url:
@@ -151,8 +150,8 @@ class KnowledgeLearner:
         show_id: str,
         episode_id: str,
         youtube_url: str,
-        show_title: Optional[str] = None,
-        channel_url: Optional[str] = None,
+        show_title: str | None = None,
+        channel_url: str | None = None,
     ) -> EpisodeMapping:
         """Instance method convenience for learn_youtube_mapping."""
         if self.repository is None:

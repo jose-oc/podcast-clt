@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from typer.testing import CliRunner
 
@@ -100,8 +101,9 @@ def test_search_command_no_results() -> None:
 
 def test_search_command_interactive_cancel_selection() -> None:
     """Test interactive search when user selects 'Cancel / Exit' or aborts."""
-    from podcast_ctl.cli.commands.search import search_command
     import sys
+
+    from podcast_ctl.cli.commands.search import search_command
 
     mock_results = [
         PodcastSearchResult(
@@ -124,8 +126,9 @@ def test_search_command_interactive_cancel_selection() -> None:
 
 def test_search_command_interactive_cancel_action() -> None:
     """Test interactive search when user selects a show but cancels the action."""
-    from podcast_ctl.cli.commands.search import search_command
     import sys
+
+    from podcast_ctl.cli.commands.search import search_command
 
     mock_item = PodcastSearchResult(
         collection_id=123,
@@ -146,8 +149,9 @@ def test_search_command_interactive_cancel_action() -> None:
 
 def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) -> None:
     """Test interactive search selecting 'Print Feed URL' action."""
-    from podcast_ctl.cli.commands.search import search_command
     import sys
+
+    from podcast_ctl.cli.commands.search import search_command
 
     mock_item = PodcastSearchResult(
         collection_id=123,
@@ -169,8 +173,9 @@ def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) ->
 
 def test_search_command_interactive_action_inspect() -> None:
     """Test interactive search selecting 'Inspect Show & Episodes' action."""
-    from podcast_ctl.cli.commands.search import search_command
     import sys
+
+    from podcast_ctl.cli.commands.search import search_command
 
     mock_item = PodcastSearchResult(
         collection_id=123,
@@ -192,8 +197,9 @@ def test_search_command_interactive_action_inspect() -> None:
 
 def test_search_command_interactive_action_transcribe() -> None:
     """Test interactive search selecting 'Transcribe Latest Episode' action."""
-    from podcast_ctl.cli.commands.search import search_command
     import sys
+
+    from podcast_ctl.cli.commands.search import search_command
 
     mock_item = PodcastSearchResult(
         collection_id=123,

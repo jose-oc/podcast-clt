@@ -1,7 +1,8 @@
 """Unit tests for domain models and SQLite storage repository."""
 
-from pathlib import Path
 import sqlite3
+from pathlib import Path
+
 import pytest
 
 from podcast_ctl.models import (
@@ -19,7 +20,6 @@ from podcast_ctl.storage import (
     StorageRepository,
     get_default_db_path,
 )
-
 
 # =============================================================================
 # Fixtures

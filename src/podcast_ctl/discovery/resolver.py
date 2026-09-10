@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
+
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,7 +35,7 @@ class ResolvedSource(BaseModel):
         description="Identified source type: 'local', 'youtube', 'rss', or 'search'",
     )
     query: str = Field(..., description="Original input query, URL, or file path")
-    show_metadata: Optional[ShowMetadata] = Field(
+    show_metadata: ShowMetadata | None = Field(
         default=None,
         description="Show metadata if input resolved from an RSS feed",
     )
@@ -46,7 +47,7 @@ class ResolvedSource(BaseModel):
         default_factory=list,
         description="iTunes search results if input was a text search query",
     )
-    raw_data: Optional[dict[str, Any]] = Field(
+    raw_data: dict[str, Any] | None = Field(
         default=None,
         description="Source-specific raw metadata (e.g. YouTube playlist/channel info)",
     )
@@ -65,7 +66,7 @@ class ResolvedSource(BaseModel):
 def resolve_input(
     input_source: str,
     search_limit: int = 10,
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     timeout: float = 15.0,
 ) -> ResolvedSource:
     """Resolve any input string (local audio file, YouTube URL, RSS URL, or plain text query).

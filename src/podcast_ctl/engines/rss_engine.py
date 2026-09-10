@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
+
 import httpx
 
 from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
-    TranscriptNotFoundError,
     TranscriptionEngineError,
+    TranscriptNotFoundError,
 )
 from podcast_ctl.models.transcript import (
     EpisodeMetadata,
@@ -52,7 +53,7 @@ def parse_timestamp_seconds(ts_str: str) -> float:
         raise ValueError(f"Unrecognized timestamp format: '{ts_str}'")
 
 
-def clean_vtt_text(text: str, is_plain_text: bool = False) -> tuple[str, Optional[str]]:
+def clean_vtt_text(text: str, is_plain_text: bool = False) -> tuple[str, str | None]:
     """Clean WebVTT cue text, extracting speaker tags if present.
 
     Handles:
@@ -62,7 +63,7 @@ def clean_vtt_text(text: str, is_plain_text: bool = False) -> tuple[str, Optiona
     - `Speaker: Text`
     - Strips remaining HTML/VTT tags like `<b>`, `<i>`, `<c.color>`, `</v>`, etc.
     """
-    speaker: Optional[str] = None
+    speaker: str | None = None
 
     # Check for <v ...> speaker tag
     v_match = re.match(r"<\s*v(?:\.[^>]+)?\s+([^>]+)>(.*)$", text, re.DOTALL | re.IGNORECASE)
@@ -220,7 +221,7 @@ def parse_json_transcript(content: str | dict[str, Any] | list[Any]) -> list[Tra
     else:
         data = content
 
-    raw_segments: list[dict[str, Any]] = []
+    raw_segments: list[Any] = []
 
     if isinstance(data, list):
         raw_segments = data
@@ -294,7 +295,7 @@ def parse_json_transcript(content: str | dict[str, Any] | list[Any]) -> list[Tra
     return segments
 
 
-def parse_plain_text(content: str, default_duration: Optional[float] = None) -> list[TranscriptSegment]:
+def parse_plain_text(content: str, default_duration: float | None = None) -> list[TranscriptSegment]:
     """Parse plain text into segments by splitting paragraphs."""
     paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
     if not paragraphs:
@@ -357,7 +358,7 @@ class RSSTranscriptionEngine(BaseTranscriptionEngine):
         return True
 
     def parse_content_by_type(
-        self, content: str, mime_type: str, url: str, default_duration: Optional[float] = None
+        self, content: str, mime_type: str, url: str, default_duration: float | None = None
     ) -> list[TranscriptSegment]:
         """Route content to appropriate parser based on MIME type or URL extension."""
         mime = mime_type.lower()
@@ -388,7 +389,7 @@ class RSSTranscriptionEngine(BaseTranscriptionEngine):
     async def transcribe(
         self,
         episode: EpisodeMetadata,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
         **kwargs: Any,
     ) -> TranscriptResult:
         """Download and parse RSS transcript for given episode."""

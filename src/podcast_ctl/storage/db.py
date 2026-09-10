@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import os
-from pathlib import Path
 import sqlite3
-from typing import Generator, Optional, Union
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
 
 DEFAULT_DB_DIR = Path.home() / ".local" / "share" / "podcast-ctl"
 DEFAULT_DB_FILE = "podcast_ctl.db"
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge_mappings(mapping_type
 class Database:
     """Manages SQLite connections with WAL mode and schema initialization."""
 
-    def __init__(self, db_path: Optional[Union[str, Path]] = None) -> None:
+    def __init__(self, db_path: str | Path | None = None) -> None:
         if db_path is None:
             self.db_path = get_default_db_path()
             self._is_memory = False
@@ -85,7 +85,7 @@ class Database:
             self.db_path = Path(db_path)
             self._is_memory = False
 
-        self._memory_conn: Optional[sqlite3.Connection] = None
+        self._memory_conn: sqlite3.Connection | None = None
         if not self._is_memory and str(self.db_path) != ":memory:":
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
 

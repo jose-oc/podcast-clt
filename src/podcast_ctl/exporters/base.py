@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
 
 from podcast_ctl.models.transcript import TranscriptResult
 
@@ -12,7 +11,7 @@ from podcast_ctl.models.transcript import TranscriptResult
 def format_timestamp(
     seconds: float,
     always_include_hours: bool = True,
-    decimal_separator: Optional[str] = None,
+    decimal_separator: str | None = None,
     decimal_places: int = 3,
 ) -> str:
     """Format a duration in seconds into a timestamp string.
@@ -35,7 +34,7 @@ def format_timestamp(
 
     if decimal_separator is not None:
         factor = 10**decimal_places
-        ms_val = int(round(fraction * factor))
+        ms_val = round(fraction * factor)
         if ms_val >= factor:
             return format_timestamp(
                 seconds=float(total_seconds + 1),
@@ -55,7 +54,7 @@ def format_timestamp(
     return f"{minutes:02d}:{secs:02d}"
 
 
-def format_duration(duration_seconds: Optional[float]) -> str:
+def format_duration(duration_seconds: float | None) -> str:
     """Format duration into standard 'HH:MM:SS' format."""
     if duration_seconds is None or duration_seconds < 0:
         return "00:00:00"
@@ -73,7 +72,7 @@ class BaseExporter(ABC):
         """Export TranscriptResult to a string representation."""
         raise NotImplementedError
 
-    def save(self, result: TranscriptResult, output_path: Union[str, Path]) -> Path:
+    def save(self, result: TranscriptResult, output_path: str | Path) -> Path:
         """Export result and write content to destination path."""
         path = Path(output_path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)

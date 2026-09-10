@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
-from rich.table import Table
+from typing import Annotated
+
 import typer
+from rich.table import Table
 
 from podcast_ctl.gatekeeper.learning import KnowledgeLearner
 from podcast_ctl.models.knowledge import ShowMapping
@@ -32,7 +33,7 @@ mapping_app.add_typer(mapping_remove_app, name="remove")
 @mapping_app.command("list")
 def list_mappings(
     show: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--show",
             "-s",
@@ -91,7 +92,7 @@ def list_mappings(
 def add_show_mapping(
     feed_url: Annotated[str, typer.Argument(help="Podcast RSS feed URL")],
     youtube_channel_url: Annotated[str, typer.Argument(help="Associated YouTube channel URL")],
-    title: Annotated[Optional[str], typer.Option("--title", "-t", help="Optional show title")] = None,
+    title: Annotated[str | None, typer.Option("--title", "-t", help="Optional show title")] = None,
 ) -> None:
     """Add or update a Show <-> YouTube Channel mapping."""
     repo = StorageRepository()

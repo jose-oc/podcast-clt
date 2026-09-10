@@ -1,9 +1,10 @@
 """Comprehensive unit tests for the discovery and ingestion engine."""
 
 import json
-from pathlib import Path
 import subprocess
 import wave
+from pathlib import Path
+
 import httpx
 import pytest
 import respx
@@ -17,7 +18,6 @@ from podcast_ctl.discovery import (
     extract_youtube_video_id,
     fetch_and_parse_feed,
     get_youtube_subtitles_metadata,
-    get_youtube_video_info,
     inspect_local_file,
     is_supported_audio_file,
     is_youtube_url,
@@ -26,7 +26,6 @@ from podcast_ctl.discovery import (
     parse_duration,
     parse_feed_content,
     parse_youtube_url,
-    probe_media_file,
     resolve_input,
     search_itunes,
     search_podcast,
@@ -318,7 +317,7 @@ class TestRssDiscovery:
         assert show_meta.total_episodes == 0
         assert episodes == []
 
-        show_meta2, episodes2 = parse_feed_content("Not valid XML <><>")
+        _show_meta2, episodes2 = parse_feed_content("Not valid XML <><>")
         assert episodes2 == []
 
 

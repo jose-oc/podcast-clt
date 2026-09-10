@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
-from pathlib import Path
 import shutil
 import subprocess
-from typing import Any, Optional, Union
 import wave
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from podcast_ctl.models.transcript import EpisodeMetadata
 
@@ -33,7 +33,7 @@ SUPPORTED_AUDIO_EXTENSIONS = frozenset({
 })
 
 
-def is_supported_audio_file(path: Union[str, Path]) -> bool:
+def is_supported_audio_file(path: str | Path) -> bool:
     """Check whether a given path has a supported audio or media file extension.
 
     Args:
@@ -48,7 +48,7 @@ def is_supported_audio_file(path: Union[str, Path]) -> bool:
     return ext in SUPPORTED_AUDIO_EXTENSIONS
 
 
-def probe_media_file(path: Union[str, Path]) -> dict[str, Any]:
+def probe_media_file(path: str | Path) -> dict[str, Any]:
     """Inspect local media file metadata and stream properties using ffprobe.
 
     Falls back to basic standard library inspection (e.g., wave for .wav files)
@@ -129,7 +129,7 @@ def probe_media_file(path: Union[str, Path]) -> dict[str, Any]:
     return result
 
 
-def inspect_local_file(path: Union[str, Path]) -> EpisodeMetadata:
+def inspect_local_file(path: str | Path) -> EpisodeMetadata:
     """Validate a local media file and return its normalized EpisodeMetadata.
 
     Args:
@@ -172,11 +172,11 @@ def inspect_local_file(path: Union[str, Path]) -> EpisodeMetadata:
     episode_id = f"local_{path_hash}"
 
     # Determine publication / creation date
-    pub_date: Optional[str] = tags.get("date") or tags.get("creation_time")
+    pub_date: str | None = tags.get("date") or tags.get("creation_time")
     if not pub_date:
         try:
             mtime = resolved.stat().st_mtime
-            pub_date = datetime.fromtimestamp(mtime, timezone.utc).isoformat()
+            pub_date = datetime.fromtimestamp(mtime, UTC).isoformat()
         except Exception:
             pub_date = None
 

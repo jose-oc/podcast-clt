@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 from podcast_ctl.gatekeeper import (
@@ -23,7 +23,6 @@ from podcast_ctl.models import (
 )
 from podcast_ctl.storage import Database, StorageRepository
 from podcast_ctl.ui.console import UIConsole
-
 
 # =============================================================================
 # Fixtures

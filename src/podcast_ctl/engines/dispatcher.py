@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
     EngineUnavailableError,
-    TranscriptNotFoundError,
     TranscriptionEngineError,
+    TranscriptNotFoundError,
 )
 from podcast_ctl.engines.cloud_engine import CloudTranscriptionEngine
 from podcast_ctl.engines.rss_engine import RSSTranscriptionEngine
@@ -29,8 +29,8 @@ class TranscriptionDispatcher:
 
     def __init__(
         self,
-        storage_repo: Optional[StorageRepository] = None,
-        engines: Optional[dict[str, BaseTranscriptionEngine]] = None,
+        storage_repo: StorageRepository | None = None,
+        engines: dict[str, BaseTranscriptionEngine] | None = None,
         default_engine: str = "auto",
     ) -> None:
         self.storage_repo = storage_repo or StorageRepository()
@@ -74,7 +74,7 @@ class TranscriptionDispatcher:
     async def transcribe(
         self,
         episode: EpisodeMetadata,
-        engine: Optional[str] = None,
+        engine: str | None = None,
         force: bool = False,
         bypass_cache: bool = False,
         **kwargs: Any,
@@ -100,7 +100,7 @@ class TranscriptionDispatcher:
                 return cached
 
         # 2. Check for YouTube knowledge mapping if applicable
-        mapped_youtube_url: Optional[str] = None
+        mapped_youtube_url: str | None = None
         if self.storage_repo:
             ep_mapping = self.storage_repo.get_episode_mapping(show_id, episode_id)
             if ep_mapping and ep_mapping.youtube_video_url:

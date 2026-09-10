@@ -10,11 +10,11 @@ import asyncio
 import logging
 import math
 import os
-from pathlib import Path
 import platform
 import shutil
 import tempfile
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -62,8 +62,8 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
     def __init__(
         self,
         default_model_size: str = "base",
-        device: Optional[str] = None,
-        compute_type: Optional[str] = None,
+        device: str | None = None,
+        compute_type: str | None = None,
         download_timeout: float = 300.0,
     ) -> None:
         self.default_model_size = default_model_size
@@ -85,7 +85,11 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:
-            raise EngineUnavailableError("faster-whisper is not installed.") from exc
+            raise EngineUnavailableError(
+                "faster-whisper is not installed. "
+                "Install it with the optional extra: pip install 'podcast-ctl[whisper]' "
+                "(or `uv sync --extra whisper` from a source checkout)."
+            ) from exc
 
         cache_key = f"{model_size}::{device}::{compute_type}"
         if cache_key not in self._model_cache:
@@ -102,7 +106,7 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
         async with httpx.AsyncClient(timeout=self.download_timeout, follow_redirects=True) as client:
             async with client.stream("GET", url) as response:
                 response.raise_for_status()
-                with open(target_path, "wb") as f:
+                with open(target_path, "wb") as f:  # noqa: ASYNC230 - streamed download; sync file write kept simple
                     async for chunk in response.aiter_bytes(chunk_size=65536):
                         f.write(chunk)
 
@@ -144,7 +148,7 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
         model_size: str,
         device: str,
         compute_type: str,
-        language: Optional[str] = None,
+        language: str | None = None,
         beam_size: int = 5,
         vad_filter: bool = True,
         **whisper_kwargs: Any,
@@ -190,7 +194,9 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
         """Download audio, convert to 16kHz WAV, and run local Whisper transcription."""
         if not self.is_available():
             raise EngineUnavailableError(
-                "Local Whisper engine is not available. Ensure `faster-whisper` is installed."
+                "Local Whisper engine is not available: `faster-whisper` is not installed. "
+                "Install it with the optional extra: pip install 'podcast-ctl[whisper]' "
+                "(or `uv sync --extra whisper` from a source checkout)."
             )
 
         # Device & compute type resolution
@@ -204,13 +210,13 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
 
         # Audio source resolution
         local_path_arg = kwargs.get("audio_path") or kwargs.get("local_path")
-        temp_dir: Optional[str] = None
-        temp_raw_file: Optional[Path] = None
-        temp_wav_file: Optional[Path] = None
-        transcribe_target_file: Optional[str] = None
+        temp_dir: str | None = None
+        temp_raw_file: Path | None = None
+        temp_wav_file: Path | None = None
+        transcribe_target_file: str | None = None
 
         try:
-            if local_path_arg and Path(local_path_arg).exists():
+            if local_path_arg and Path(local_path_arg).exists():  # noqa: ASYNC240 - cheap metadata check
                 audio_input = Path(local_path_arg)
             elif episode.audio_url and (
                 episode.audio_url.startswith("http://") or episode.audio_url.startswith("https://")
@@ -228,7 +234,7 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
                 logger.info(f"Downloading episode audio from {episode.audio_url}...")
                 await self._download_audio(episode.audio_url, temp_raw_file)
                 audio_input = temp_raw_file
-            elif episode.audio_url and Path(episode.audio_url).exists():
+            elif episode.audio_url and Path(episode.audio_url).exists():  # noqa: ASYNC240 - cheap metadata check
                 audio_input = Path(episode.audio_url)
             else:
                 raise TranscriptionEngineError(
@@ -264,7 +270,7 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
             )
 
         finally:
-            if not keep_audio and temp_dir is not None and os.path.exists(temp_dir):
+            if not keep_audio and temp_dir is not None and os.path.exists(temp_dir):  # noqa: ASYNC240 - best-effort cleanup
                 try:
                     shutil.rmtree(temp_dir, ignore_errors=True)
                 except Exception as exc:

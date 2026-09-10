@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Optional
+
 import questionary
 from rich.panel import Panel
 from rich.table import Table
 
 from podcast_ctl.gatekeeper.inspector import PreFlightSummary
 from podcast_ctl.models.transcript import EpisodeMetadata
-from podcast_ctl.ui.console import UIConsole, console as default_console
+from podcast_ctl.ui.console import UIConsole
+from podcast_ctl.ui.console import console as default_console
 
 
-def estimate_cloud_cost(duration_seconds: Optional[float], rate_per_minute: float = 0.006) -> float:
+def estimate_cloud_cost(duration_seconds: float | None, rate_per_minute: float = 0.006) -> float:
     """Estimate cloud transcription cost based on audio duration (default rate $0.006/min for Groq)."""
     if not duration_seconds or duration_seconds <= 0:
         return 0.0
@@ -23,7 +24,7 @@ def estimate_cloud_cost(duration_seconds: Optional[float], rate_per_minute: floa
 def prompt_batch_confirmation(
     summary: PreFlightSummary,
     auto_confirm: bool = False,
-    console: Optional[UIConsole] = None,
+    console: UIConsole | None = None,
 ) -> bool:
     """Display batch summary table and prompt user for confirmation to proceed.
 
@@ -89,9 +90,9 @@ def prompt_youtube_mapping(
     duration_str: str,
     channel_title: str,
     auto_confirm: bool = False,
-    confidence: Optional[float] = None,
-    console: Optional[UIConsole] = None,
-) -> tuple[str, Optional[str]]:
+    confidence: float | None = None,
+    console: UIConsole | None = None,
+) -> tuple[str, str | None]:
     """Prompt user to validate a candidate YouTube video match for an episode.
 
     Args:
@@ -167,7 +168,7 @@ def prompt_cloud_cost_approval(
     episode: EpisodeMetadata,
     estimated_cost_usd: float,
     auto_confirm: bool = False,
-    console: Optional[UIConsole] = None,
+    console: UIConsole | None = None,
 ) -> tuple[bool, bool]:
     """Prompt user to approve cloud API expenditure for an episode.
 

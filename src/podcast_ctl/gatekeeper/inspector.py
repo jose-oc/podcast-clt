@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from podcast_ctl.discovery.youtube import is_youtube_url
@@ -96,13 +96,13 @@ class PreFlightSummary(BaseModel):
 class PreFlightInspector:
     """Pre-flight analyzer that inspects workload, cache, and available tiers."""
 
-    def __init__(self, repository: Optional[StorageRepository] = None) -> None:
+    def __init__(self, repository: StorageRepository | None = None) -> None:
         self.repository = repository
 
     def inspect_episodes_sync(
         self,
         episodes: list[EpisodeMetadata],
-        repository: Optional[StorageRepository] = None,
+        repository: StorageRepository | None = None,
         preferred_engine: str = "auto",
     ) -> PreFlightSummary:
         """Inspect a list of episodes synchronously and return pre-flight summary."""
@@ -148,7 +148,11 @@ class PreFlightInspector:
                     chosen_tier = "youtube"
                 elif ep.source_type == "youtube" or (ep.audio_url and is_youtube_url(ep.audio_url)):
                     chosen_tier = "youtube"
-                elif repo is not None and repo.get_show_mapping(show_id) and repo.get_show_mapping(show_id).youtube_channel_url:
+                elif (
+                    repo is not None
+                    and (show_mapping := repo.get_show_mapping(show_id)) is not None
+                    and show_mapping.youtube_channel_url
+                ):
                     chosen_tier = "youtube"
                 else:
                     # 3c. Default fallback in auto mode is Whisper (local)
@@ -175,7 +179,7 @@ class PreFlightInspector:
     async def inspect_episodes(
         self,
         episodes: list[EpisodeMetadata],
-        repository: Optional[StorageRepository] = None,
+        repository: StorageRepository | None = None,
         preferred_engine: str = "auto",
     ) -> PreFlightSummary:
         """Inspect a list of episodes asynchronously and return pre-flight summary."""

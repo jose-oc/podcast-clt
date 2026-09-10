@@ -41,6 +41,24 @@ Or install in editable mode:
 uv pip install -e .
 ```
 
+### Optional: local Whisper transcription (Tier 3)
+
+The default install covers Tier 1 (RSS transcripts), Tier 2 (YouTube
+captions), and Tier 4 (cloud APIs). Tier 3 (fully local, private
+transcription with `faster-whisper`) pulls in heavy native dependencies, so
+it ships as an optional extra:
+
+```bash
+# From a source checkout
+uv sync --extra whisper
+
+# Or as a package
+pip install 'podcast-ctl[whisper]'
+```
+
+Without the extra, the CLI works normally and simply skips the Whisper tier
+in the automatic fallback chain.
+
 ---
 
 ## Quickstart
@@ -95,6 +113,26 @@ For deep dives into the system design, fallback logic, and database schemas, che
 - [System Architecture](docs/ARCHITECTURE.md)
 - [CLI Reference Guide](docs/CLI_REFERENCE.md)
 - [Phase 2 AI Post-Processing Design](docs/POST_PROCESSING_DESIGN.md)
+
+---
+
+## Development
+
+```bash
+# Install everything (all extras + dev tools)
+uv sync --all-extras --all-groups
+
+# Unit tests
+uv run pytest -m "not integration"
+
+# Integration tests (hit real feeds, iTunes Search and YouTube;
+# they skip on transient network errors and YouTube datacenter-IP blocks)
+uv run pytest -m integration
+
+# Lint & type check (also enforced in CI)
+uv run ruff check .
+uv run mypy
+```
 
 ---
 
