@@ -87,6 +87,15 @@ Transcribe a specific episode using local Whisper `small` model:
 podcast-ctl transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
 ```
 
+Transcribe several episodes at once - by number list or range, title pattern, publication dates, or an interactive picker. Every selection is shown (number, date, title, duration) before confirming:
+```bash
+podcast-ctl transcribe "Marketing Online" --episodes 2890,2894,2901
+podcast-ctl transcribe "Marketing Online" --episodes 2890..2900
+podcast-ctl transcribe "Marketing Online" --match "Kubernetes|Talos"
+podcast-ctl transcribe "Marketing Online" --since 2026-01-01 --until 2026-03-31
+podcast-ctl transcribe "Marketing Online" --pick
+```
+
 Transcribe a local recording to all formats:
 ```bash
 podcast-ctl transcribe ./meeting.m4a -o ./transcripts --format all
