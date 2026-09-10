@@ -1,7 +1,11 @@
 # Phase 2 — Podcast Knowledge Base for LLM Retrieval
 
-Design proposal (research + architecture, implementation pending).
+Design proposal (research + architecture).
 Prepared 2026-09-10. Confirmed by Jose the same day.
+
+**Status (2026-09-10):** phases **2a** and **2b** are implemented — see
+[KNOWLEDGE_BASE.md](KNOWLEDGE_BASE.md) for the user guide. Phases 2c
+(embeddings + hybrid fusion) and 2d (evaluation harness) remain pending.
 
 ## TL;DR
 

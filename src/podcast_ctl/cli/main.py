@@ -9,6 +9,7 @@ import typer
 from podcast_ctl import __version__
 from podcast_ctl.cli.commands.cache import cache_app
 from podcast_ctl.cli.commands.inspect import inspect_command
+from podcast_ctl.cli.commands.kb import kb_app
 from podcast_ctl.cli.commands.mapping import mapping_app
 from podcast_ctl.cli.commands.search import search_command
 from podcast_ctl.cli.commands.transcribe import transcribe_command
@@ -49,6 +50,12 @@ app.add_typer(
     cache_app,
     name="cache",
     help="Inspect, list, and manage SQLite cached transcripts and storage.",
+)
+
+app.add_typer(
+    kb_app,
+    name="kb",
+    help="Build and query the knowledge base derived from cached transcripts.",
 )
 
 
