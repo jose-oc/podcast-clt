@@ -1,5 +1,9 @@
 name: Tests
 
+# Least-privilege token: the jobs only check out code and run tests.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
