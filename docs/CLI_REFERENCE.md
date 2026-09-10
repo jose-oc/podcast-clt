@@ -243,12 +243,29 @@ podcast-ctl kb build [--show <show_id>] [--kb-dir <path>]
 ```
 Unchanged episodes are skipped; episodes removed from the cache are pruned.
 
-#### `kb search`
-Search the chunk index (BM25, diacritics-insensitive; AND first, OR fallback).
+#### `kb embed`
+Embed indexed chunks for vector/hybrid search (phase 2c). Incremental and
+idempotent; every vector records model/version/dimension provenance.
 ```bash
-podcast-ctl kb search <query> [--limit <N>] [--show <show_id>] [--json] [--context] [--kb-dir <path>]
+podcast-ctl kb embed [--provider local|openai-compatible] [--model <name>] [--show <show_id>] [--reindex] [--batch-size <N>] [--kb-dir <path>]
 ```
-* `--json`: machine-readable chunks for scripting.
+* Default backend is local sentence-transformers (`BAAI/bge-m3`), installed
+  via the optional `podcast-ctl[embeddings]` extra.
+* `openai-compatible` is a thin cloud adapter configured through
+  `PODCAST_CTL_EMBED_BASE_URL` / `PODCAST_CTL_EMBED_API_KEY` /
+  `PODCAST_CTL_EMBED_MODEL`.
+* `--reindex` is required when switching providers/models: stored vectors
+  from an incompatible model are dropped and rebuilt, never mixed.
+
+#### `kb search`
+Search the chunk index. Default mode is `auto`: hybrid retrieval (RRF k=60
+over lexical BM25 + vector cosine) once embeddings exist, lexical before
+that. Lexical matching is diacritics-insensitive (AND first, OR fallback).
+```bash
+podcast-ctl kb search <query> [--limit <N>] [--show <show_id>] [--mode auto|lexical|vector|hybrid] [--provider <name>] [--model <name>] [--json] [--context] [--kb-dir <path>]
+```
+* `--json`: machine-readable chunks for scripting (adds `mode`, `sources`,
+  `bm25`, `cosine` fields for vector/hybrid results).
 * `--context`: full chunks as Markdown blocks, ready to paste into an LLM.
 
 #### `kb status`
@@ -267,6 +284,9 @@ podcast-ctl kb status [--kb-dir <path>]
 | :--- | :--- | :--- |
 | `PODCAST_CTL_DB_PATH` | Custom path to SQLite database file. | `~/.local/share/podcast-ctl/podcast_ctl.db` |
 | `PODCAST_CTL_KB_DIR` | Custom path to the knowledge base directory. | `kb/` next to the catalog DB |
+| `PODCAST_CTL_EMBED_MODEL` | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3` |
+| `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API. | None |
+| `PODCAST_CTL_EMBED_API_KEY` | API key for the KB cloud embedding adapter. | None |
 | `GROQ_API_KEY` | API key for Groq Cloud Whisper API. | None |
 | `OPENAI_API_KEY` | API key for OpenAI Whisper API. | None |
 

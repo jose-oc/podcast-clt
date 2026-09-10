@@ -3,9 +3,13 @@
 Design proposal (research + architecture).
 Prepared 2026-09-10. Confirmed by Jose the same day.
 
-**Status (2026-09-10):** phases **2a** and **2b** are implemented — see
-[KNOWLEDGE_BASE.md](KNOWLEDGE_BASE.md) for the user guide. Phases 2c
-(embeddings + hybrid fusion) and 2d (evaluation harness) remain pending.
+**Status (2026-09-10):** phases **2a**, **2b**, and **2c** are implemented —
+see [KNOWLEDGE_BASE.md](KNOWLEDGE_BASE.md) for the user guide. Phase 2d
+(evaluation harness) remains pending. Implementation note for 2c: vectors are
+stored as float32 BLOBs in `kb.sqlite` and compared with an in-process cosine
+over unit-normalized vectors instead of loading sqlite-vec, so the index file
+needs no native extension and stays portable; sqlite-vec remains a drop-in
+performance option that would reuse the same stored vectors and provenance.
 
 ## TL;DR
 

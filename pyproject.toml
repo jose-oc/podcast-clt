@@ -28,6 +28,12 @@ dependencies = [
 whisper = [
     "faster-whisper>=1.0.0",
 ]
+# Phase 2c (local embeddings) pulls in torch via sentence-transformers, which
+# is large. Install only if you want vector/hybrid KB search:
+#   pip install 'podcast-ctl[embeddings]'
+embeddings = [
+    "sentence-transformers>=2.7.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
