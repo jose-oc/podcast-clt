@@ -98,6 +98,75 @@ def test_search_command_no_results() -> None:
         assert "No podcast search results found" in result.stdout
 
 
+def test_search_command_interactive_cancel_selection() -> None:
+    """Test interactive search when user selects 'Cancel / Exit' or aborts."""
+    from podcast_cli.cli.commands.search import search_command
+    import sys
+
+    mock_results = [
+        PodcastSearchResult(
+            collection_id=123,
+            title="Talk Python To Me",
+            author="Michael Kennedy",
+            feed_url="https://talkpython.fm/rss",
+            episode_count=450,
+        )
+    ]
+    with (
+        patch("podcast_cli.cli.commands.search.search_itunes", return_value=mock_results),
+        patch.object(sys.stdin, "isatty", return_value=True),
+        patch("questionary.select") as mock_select,
+    ):
+        mock_select.return_value.ask.return_value = "cancel"
+        # Should return gracefully without any exception
+        search_command(query="Python", interactive=True)
+
+
+def test_search_command_interactive_cancel_action() -> None:
+    """Test interactive search when user selects a show but cancels the action."""
+    from podcast_cli.cli.commands.search import search_command
+    import sys
+
+    mock_item = PodcastSearchResult(
+        collection_id=123,
+        title="Talk Python To Me",
+        author="Michael Kennedy",
+        feed_url="https://talkpython.fm/rss",
+        episode_count=450,
+    )
+    with (
+        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch.object(sys.stdin, "isatty", return_value=True),
+        patch("questionary.select") as mock_select,
+    ):
+        mock_select.return_value.ask.side_effect = [mock_item, "cancel"]
+        # Should return gracefully without any exception
+        search_command(query="Python", interactive=True)
+
+
+def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) -> None:
+    """Test interactive search selecting 'Print Feed URL' action."""
+    from podcast_cli.cli.commands.search import search_command
+    import sys
+
+    mock_item = PodcastSearchResult(
+        collection_id=123,
+        title="Talk Python To Me",
+        author="Michael Kennedy",
+        feed_url="https://talkpython.fm/rss",
+        episode_count=450,
+    )
+    with (
+        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch.object(sys.stdin, "isatty", return_value=True),
+        patch("questionary.select") as mock_select,
+    ):
+        mock_select.return_value.ask.side_effect = [mock_item, "url"]
+        search_command(query="Python", interactive=True)
+        captured = capsys.readouterr()
+        assert "https://talkpython.fm/rss" in captured.out
+
+
 # =============================================================================
 # Inspect Command Tests
 # =============================================================================

@@ -58,14 +58,14 @@ def search_command(
             for idx, item in enumerate(results, start=1)
             if item.feed_url
         ]
-        choices.append(questionary.Choice(title="Cancel / Exit", value=None))
+        choices.append(questionary.Choice(title="Cancel / Exit", value="cancel"))
 
         selected = questionary.select(
             "Select a podcast to inspect or transcribe:",
             choices=choices,
         ).ask()
 
-        if not selected or not selected.feed_url:
+        if not selected or selected == "cancel" or not hasattr(selected, "feed_url") or not selected.feed_url:
             return
 
         action = questionary.select(
@@ -74,10 +74,13 @@ def search_command(
                 questionary.Choice("Inspect Show & Episodes", value="inspect"),
                 questionary.Choice("Transcribe Latest Episode", value="transcribe"),
                 questionary.Choice("Print Feed URL", value="url"),
-                questionary.Choice("Cancel", value=None),
+                questionary.Choice("Cancel", value="cancel"),
             ],
             default="inspect",
         ).ask()
+
+        if not action or action == "cancel":
+            return
 
         if action == "inspect":
             from podcast_cli.cli.commands.inspect import inspect_command
