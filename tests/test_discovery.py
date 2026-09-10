@@ -340,6 +340,7 @@ class TestYouTubeDiscovery:
 
         assert is_youtube_url("https://example.com/audio.mp3") is False
         assert is_youtube_url("not a url") is False
+        assert is_youtube_url("https://youtu.be.evil.com/dQw4w9WgXcQ") is False
         assert is_youtube_url("") is False
 
     def test_extract_youtube_video_id(self) -> None:
@@ -350,6 +351,10 @@ class TestYouTubeDiscovery:
         assert extract_youtube_video_id("dQw4w9WgXcQ") == "dQw4w9WgXcQ"
         assert extract_youtube_video_id("https://www.youtube.com/playlist?list=PL123") is None
         assert extract_youtube_video_id("invalid") is None
+        # Look-alike hosts must not pass the youtu.be branch
+        assert extract_youtube_video_id("https://youtu.be.evil.com/dQw4w9WgXcQ") is None
+        assert extract_youtube_video_id("https://youtu.be.evil.com") is None
+        assert extract_youtube_video_id("https://www.youtu.be.evil.com") is None
 
     def test_parse_youtube_url(self) -> None:
         # Video URL

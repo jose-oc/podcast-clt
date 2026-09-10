@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 import respx
@@ -384,7 +385,7 @@ class TestCloudEngine:
         engine_groq = CloudTranscriptionEngine(provider="groq")
         assert engine_groq.is_available() is True
         assert engine_groq.api_key == "gsk_test_key_123"
-        assert "groq.com" in engine_groq.endpoint_url
+        assert urlparse(engine_groq.endpoint_url).hostname == "api.groq.com"
         assert engine_groq.default_model == "whisper-large-v3"
 
         monkeypatch.delenv("GROQ_API_KEY", raising=False)
@@ -392,7 +393,7 @@ class TestCloudEngine:
         engine_openai = CloudTranscriptionEngine(provider="openai")
         assert engine_openai.is_available() is True
         assert engine_openai.api_key == "sk-openai-key-456"
-        assert "openai.com" in engine_openai.endpoint_url
+        assert urlparse(engine_openai.endpoint_url).hostname == "api.openai.com"
         assert engine_openai.default_model == "whisper-1"
 
     @respx.mock
