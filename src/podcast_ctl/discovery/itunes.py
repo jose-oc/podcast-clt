@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
 ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup"
-DEFAULT_USER_AGENT = "podcast-ctl/0.1.0"
+DEFAULT_USER_AGENT = "podcast-ctl/0.2.0"
 
 
 class PodcastSearchResult(BaseModel):
