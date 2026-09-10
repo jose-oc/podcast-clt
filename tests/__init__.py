@@ -1,1 +1,1 @@
-"""Tests for podcast-cli."""
+"""Tests for podcast-ctl."""

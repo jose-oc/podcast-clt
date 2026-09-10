@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from podcast_cli.ui.console import (
+from podcast_ctl.ui.console import (
     UIConsole,
     console as global_console,
     error,
@@ -18,7 +18,7 @@ from podcast_cli.ui.console import (
     table,
     warning,
 )
-from podcast_cli.ui.theme import THEME_STYLES, custom_theme
+from podcast_ctl.ui.theme import THEME_STYLES, custom_theme
 
 
 @pytest.fixture

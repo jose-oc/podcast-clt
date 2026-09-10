@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from podcast_cli.exporters import (
+from podcast_ctl.exporters import (
     BaseExporter,
     ExportManager,
     JsonExporter,
@@ -20,7 +20,7 @@ from podcast_cli.exporters import (
     normalize_sentence_text,
     slugify,
 )
-from podcast_cli.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
+from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
 
 
 @pytest.fixture

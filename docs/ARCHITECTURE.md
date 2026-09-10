@@ -1,21 +1,21 @@
-# podcast-cli System Architecture
+# podcast-ctl System Architecture
 
-This document details the architectural design, component layers, data flows, and storage schema for `podcast-cli`.
+This document details the architectural design, component layers, data flows, and storage schema for `podcast-ctl`.
 
 ---
 
 ## 1. High-Level Architecture Overview
 
-`podcast-cli` is designed as a modular, tiered pipeline for podcast discovery, inspection, transcription, and multi-format export.
+`podcast-ctl` is designed as a modular, tiered pipeline for podcast discovery, inspection, transcription, and multi-format export.
 
 ```mermaid
 flowchart TD
     subgraph CLI ["CLI & UI Layer (Typer & Rich)"]
-        CMD_SEARCH["podcast-cli search"]
-        CMD_INSPECT["podcast-cli inspect"]
-        CMD_TRANSCRIBE["podcast-cli transcribe"]
-        CMD_MAPPING["podcast-cli mapping"]
-        CMD_CACHE["podcast-cli cache"]
+        CMD_SEARCH["podcast-ctl search"]
+        CMD_INSPECT["podcast-ctl inspect"]
+        CMD_TRANSCRIBE["podcast-ctl transcribe"]
+        CMD_MAPPING["podcast-ctl mapping"]
+        CMD_CACHE["podcast-ctl cache"]
         UI_CONSOLE["UIConsole (Themes, Tables, Spinners)"]
     end
 
@@ -115,7 +115,7 @@ flowchart LR
 
 ## 3. Component Architecture & Responsibilities
 
-### 1. CLI Layer (`podcast_cli.cli`)
+### 1. CLI Layer (`podcast_ctl.cli`)
 * Built with **Typer** and styled with **Rich**.
 * **`search`**: Queries iTunes search catalog, presents results in formatted tables, and enables interactive downstream actions.
 * **`inspect`**: Performs pre-flight dry runs estimating workload, duration, audio cache disk space, and tier distribution without executing transcription.
@@ -123,33 +123,33 @@ flowchart LR
 * **`mapping`**: Manages learned Show $\leftrightarrow$ YouTube Channel and Episode $\leftrightarrow$ YouTube Video knowledge associations.
 * **`cache`**: Inspects SQLite database metrics, lists cached transcripts, and cleans stored data.
 
-### 2. Discovery & Ingestion Layer (`podcast_cli.discovery`)
+### 2. Discovery & Ingestion Layer (`podcast_ctl.discovery`)
 * **`resolve_input`**: Polymorphic input parser automatically detecting whether the input string is a local audio file, a YouTube link, an RSS feed URL, or a text search query.
 * **`search_itunes` / `lookup_itunes`**: Robust iTunes API client with JSON parsing and normalized `PodcastSearchResult` models.
 * **`fetch_and_parse_feed`**: Defused XML and feedparser wrapper parsing standard RSS 2.0 enclosures, iTunes tags, and Podcasting 2.0 transcript tags.
 * **`inspect_local_file`**: Analyzes local `.mp3`, `.m4a`, `.wav`, `.aac`, `.flac`, `.ogg`, `.opus` audio files.
 * **`parse_youtube_url`**: Parses video IDs, shorts, playlist IDs, and channel handles.
 
-### 3. Gatekeeper & Knowledge Layer (`podcast_cli.gatekeeper`)
+### 3. Gatekeeper & Knowledge Layer (`podcast_ctl.gatekeeper`)
 * **`PreFlightInspector`**: Analyzes requested batches against local cache and available tiers, calculating total audio duration and estimated disk usage.
 * **`prompt_batch_confirmation`**: Renders summary tables and requests user approval before executing long batch runs.
 * **`prompt_youtube_mapping`**: Interactive disambiguation dialog when candidate YouTube videos are discovered.
 * **`prompt_cloud_cost_approval`**: Financial safety guardrail estimating API costs before invoking paid cloud providers.
 * **`KnowledgeLearner`**: Stores user-confirmed mappings and permissions into SQLite for zero-friction future executions.
 
-### 4. Transcription Engine Layer (`podcast_cli.engines`)
+### 4. Transcription Engine Layer (`podcast_ctl.engines`)
 * **`TranscriptionDispatcher`**: Orchestrates cache verification, engine selection, and automatic fallback chains.
 * **`RSSTranscriptionEngine`**: Handles Podcasting 2.0 transcript URLs with mime-type parsing.
 * **`YouTubeTranscriptionEngine`**: Fetches transcripts via `youtube-transcript-api` and `yt-dlp`.
 * **`WhisperTranscriptionEngine`**: Manages audio downloading, chunking, and local `faster-whisper` inference.
 * **`CloudTranscriptionEngine`**: Integrates with Groq (`whisper-large-v3`, `whisper-large-v3-turbo`) and OpenAI (`whisper-1`) REST APIs.
 
-### 5. Exporter Layer (`podcast_cli.exporters`)
+### 5. Exporter Layer (`podcast_ctl.exporters`)
 * **`ExportManager`**: Coordinates exporting normalized `TranscriptResult` objects to one or more formats.
 * Supports **Markdown** (`.md`), clean **Prose** (`.txt`), **SubRip** (`.srt`), **WebVTT** (`.vtt`), and structured **JSON** (`.json`).
 * Generates filesystem-safe directory hierarchies: `<output_dir>/<show-slug>/<episode-slug>.<ext>`.
 
-### 6. Storage & Database Layer (`podcast_cli.storage`)
+### 6. Storage & Database Layer (`podcast_ctl.storage`)
 * Persistent SQLite database configured with **WAL** (Write-Ahead Logging) mode and `synchronous=NORMAL` for concurrent safety.
 * Encapsulated through `StorageRepository` with clean CRUD methods for domain entities.
 

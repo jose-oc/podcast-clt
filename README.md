@@ -1,4 +1,4 @@
-# podcast-cli 🎙️
+# podcast-ctl 🎙️
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -29,11 +29,11 @@ Using [`uv`](https://github.com/astral-sh/uv) (recommended):
 
 ```bash
 # Clone the repository
-git clone https://github.com/jose-oc/podcast-cli.git
-cd podcast-cli
+git clone https://github.com/jose-oc/podcast-ctl.git
+cd podcast-ctl
 
 # Run directly with uv
-uv run podcast-cli --help
+uv run podcast-ctl --help
 ```
 
 Or install in editable mode:
@@ -48,29 +48,29 @@ uv pip install -e .
 ### 1. Discover Shows
 Search Apple Podcasts / iTunes directory directly from your terminal:
 ```bash
-podcast-cli search "Latent Space"
+podcast-ctl search "Latent Space"
 ```
 
 ### 2. Inspect a Feed (Pre-Flight Analysis)
 Preview episodes, duration, cache storage requirements, and tier resolutions without transcribing:
 ```bash
-podcast-cli inspect "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl inspect "https://feeds.simplecast.com/82GLSDrl"
 ```
 
 ### 3. Transcribe Episodes
 Transcribe the latest episode to Markdown (`.md`) and plain text (`.txt`):
 ```bash
-podcast-cli transcribe "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl transcribe "https://feeds.simplecast.com/82GLSDrl"
 ```
 
 Transcribe a specific episode using local Whisper `small` model:
 ```bash
-podcast-cli transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
+podcast-ctl transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
 ```
 
 Transcribe a local recording to all formats:
 ```bash
-podcast-cli transcribe ./meeting.m4a -o ./transcripts --format all
+podcast-ctl transcribe ./meeting.m4a -o ./transcripts --format all
 ```
 
 ---
@@ -79,11 +79,11 @@ podcast-cli transcribe ./meeting.m4a -o ./transcripts --format all
 
 | Command | Usage | Description |
 | :--- | :--- | :--- |
-| `search` | `podcast-cli search <query>` | Search Apple Podcasts catalog for shows and feeds. |
-| `inspect` | `podcast-cli inspect <input>` | Pre-flight inspection & tier breakdown without transcribing. |
-| `transcribe` | `podcast-cli transcribe <input>` | Transcribe episodes with multi-tier fallback and multi-format export. |
-| `mapping` | `podcast-cli mapping [list\|add\|remove]` | Manage learned Show $\leftrightarrow$ YouTube associations. |
-| `cache` | `podcast-cli cache [stats\|list\|clean]` | Inspect and manage SQLite database and transcript cache. |
+| `search` | `podcast-ctl search <query>` | Search Apple Podcasts catalog for shows and feeds. |
+| `inspect` | `podcast-ctl inspect <input>` | Pre-flight inspection & tier breakdown without transcribing. |
+| `transcribe` | `podcast-ctl transcribe <input>` | Transcribe episodes with multi-tier fallback and multi-format export. |
+| `mapping` | `podcast-ctl mapping [list\|add\|remove]` | Manage learned Show $\leftrightarrow$ YouTube associations. |
+| `cache` | `podcast-ctl cache [stats\|list\|clean]` | Inspect and manage SQLite database and transcript cache. |
 
 For detailed documentation on flags, options, and advanced configurations, see the [CLI Reference](docs/CLI_REFERENCE.md).
 

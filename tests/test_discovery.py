@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 
-from podcast_cli.discovery import (
+from podcast_ctl.discovery import (
     ITUNES_LOOKUP_URL,
     ITUNES_SEARCH_URL,
     PodcastSearchResult,
@@ -33,7 +33,7 @@ from podcast_cli.discovery import (
     search_youtube_candidates,
     youtube_video_to_metadata,
 )
-from podcast_cli.models.transcript import EpisodeMetadata
+from podcast_ctl.models.transcript import EpisodeMetadata
 
 # =============================================================================
 # 1. iTunes Search & Lookup Tests
@@ -433,7 +433,7 @@ class TestYouTubeDiscovery:
         }
 
         monkeypatch.setattr(
-            "podcast_cli.discovery.youtube.get_youtube_video_info",
+            "podcast_ctl.discovery.youtube.get_youtube_video_info",
             lambda url, **kwargs: mock_video_info,
         )
 
@@ -456,7 +456,7 @@ class TestYouTubeDiscovery:
         }
 
         monkeypatch.setattr(
-            "podcast_cli.discovery.youtube.get_youtube_video_info",
+            "podcast_ctl.discovery.youtube.get_youtube_video_info",
             lambda url, **kwargs: mock_video_info,
         )
 
@@ -591,7 +591,7 @@ class TestUnifiedResolver:
             "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         }
         monkeypatch.setattr(
-            "podcast_cli.discovery.youtube.get_youtube_video_info",
+            "podcast_ctl.discovery.youtube.get_youtube_video_info",
             lambda url, **kwargs: mock_video_info,
         )
 

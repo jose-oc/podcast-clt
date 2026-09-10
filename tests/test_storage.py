@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 import pytest
 
-from podcast_cli.models import (
+from podcast_ctl.models import (
     EpisodeMapping,
     EpisodeMetadata,
     ShowMapping,
@@ -12,7 +12,7 @@ from podcast_cli.models import (
     TranscriptSegment,
     UserPreference,
 )
-from podcast_cli.storage import (
+from podcast_ctl.storage import (
     DEFAULT_DB_DIR,
     DEFAULT_DB_FILE,
     Database,
@@ -195,11 +195,11 @@ class TestDomainModels:
 
 class TestDatabaseConnection:
     def test_default_db_path_resolution(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("PODCAST_CLI_DB_PATH", raising=False)
+        monkeypatch.delenv("PODCAST_CTL_DB_PATH", raising=False)
         default_path = get_default_db_path()
         assert default_path == DEFAULT_DB_DIR / DEFAULT_DB_FILE
 
-        monkeypatch.setenv("PODCAST_CLI_DB_PATH", "/tmp/custom_podcast.db")
+        monkeypatch.setenv("PODCAST_CTL_DB_PATH", "/tmp/custom_podcast.db")
         custom_path = get_default_db_path()
         assert custom_path == Path("/tmp/custom_podcast.db")
 

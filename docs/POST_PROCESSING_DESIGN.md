@@ -1,6 +1,6 @@
 # Post-Processing Architecture & AI Enhancement Design (Phase 2)
 
-This document outlines the architecture for the Phase 2 AI post-processing layer in `podcast-cli`, designed to run after transcription normalization.
+This document outlines the architecture for the Phase 2 AI post-processing layer in `podcast-ctl`, designed to run after transcription normalization.
 
 ---
 
@@ -75,7 +75,7 @@ Podcasts are often 1–3 hours long (20,000–60,000 words), which exceeds singl
 
 ```python
 from abc import ABC, abstractmethod
-from podcast_cli.models.transcript import TranscriptResult
+from podcast_ctl.models.transcript import TranscriptResult
 
 class BasePostProcessor(ABC):
     @abstractmethod

@@ -1,4 +1,4 @@
-"""End-to-end integration tests for podcast-cli Typer interface and subcommands."""
+"""End-to-end integration tests for podcast-ctl Typer interface and subcommands."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from podcast_cli import __version__
-from podcast_cli.cli.main import app
-from podcast_cli.discovery.itunes import PodcastSearchResult
-from podcast_cli.discovery.resolver import ResolvedSource
-from podcast_cli.discovery.rss import ShowMetadata
-from podcast_cli.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
-from podcast_cli.storage.repository import StorageRepository
+from podcast_ctl import __version__
+from podcast_ctl.cli.main import app
+from podcast_ctl.discovery.itunes import PodcastSearchResult
+from podcast_ctl.discovery.resolver import ResolvedSource
+from podcast_ctl.discovery.rss import ShowMetadata
+from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
+from podcast_ctl.storage.repository import StorageRepository
 
 runner = CliRunner(env={"COLUMNS": "250"})
 
@@ -21,8 +21,8 @@ runner = CliRunner(env={"COLUMNS": "250"})
 @pytest.fixture(autouse=True)
 def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Ensure every test runs against an isolated temporary SQLite database."""
-    db_file = tmp_path / "test_podcast_cli.db"
-    monkeypatch.setenv("PODCAST_CLI_DB_PATH", str(db_file))
+    db_file = tmp_path / "test_podcast_ctl.db"
+    monkeypatch.setenv("PODCAST_CTL_DB_PATH", str(db_file))
     return db_file
 
 
@@ -80,7 +80,7 @@ def test_search_command_with_results() -> None:
         ),
     ]
 
-    with patch("podcast_cli.cli.commands.search.search_itunes", return_value=mock_results):
+    with patch("podcast_ctl.cli.commands.search.search_itunes", return_value=mock_results):
         result = runner.invoke(app, ["search", "AI", "--no-interactive"])
         assert result.exit_code == 0
         assert "Search Results for 'AI'" in result.stdout
@@ -92,7 +92,7 @@ def test_search_command_with_results() -> None:
 
 def test_search_command_no_results() -> None:
     """Test search command when no matches are found."""
-    with patch("podcast_cli.cli.commands.search.search_itunes", return_value=[]):
+    with patch("podcast_ctl.cli.commands.search.search_itunes", return_value=[]):
         result = runner.invoke(app, ["search", "NonExistentShow123", "--no-interactive"])
         assert result.exit_code == 0
         assert "No podcast search results found" in result.stdout
@@ -100,7 +100,7 @@ def test_search_command_no_results() -> None:
 
 def test_search_command_interactive_cancel_selection() -> None:
     """Test interactive search when user selects 'Cancel / Exit' or aborts."""
-    from podcast_cli.cli.commands.search import search_command
+    from podcast_ctl.cli.commands.search import search_command
     import sys
 
     mock_results = [
@@ -113,7 +113,7 @@ def test_search_command_interactive_cancel_selection() -> None:
         )
     ]
     with (
-        patch("podcast_cli.cli.commands.search.search_itunes", return_value=mock_results),
+        patch("podcast_ctl.cli.commands.search.search_itunes", return_value=mock_results),
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("questionary.select") as mock_select,
     ):
@@ -124,7 +124,7 @@ def test_search_command_interactive_cancel_selection() -> None:
 
 def test_search_command_interactive_cancel_action() -> None:
     """Test interactive search when user selects a show but cancels the action."""
-    from podcast_cli.cli.commands.search import search_command
+    from podcast_ctl.cli.commands.search import search_command
     import sys
 
     mock_item = PodcastSearchResult(
@@ -135,7 +135,7 @@ def test_search_command_interactive_cancel_action() -> None:
         episode_count=450,
     )
     with (
-        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch("podcast_ctl.cli.commands.search.search_itunes", return_value=[mock_item]),
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("questionary.select") as mock_select,
     ):
@@ -146,7 +146,7 @@ def test_search_command_interactive_cancel_action() -> None:
 
 def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) -> None:
     """Test interactive search selecting 'Print Feed URL' action."""
-    from podcast_cli.cli.commands.search import search_command
+    from podcast_ctl.cli.commands.search import search_command
     import sys
 
     mock_item = PodcastSearchResult(
@@ -157,7 +157,7 @@ def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) ->
         episode_count=450,
     )
     with (
-        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch("podcast_ctl.cli.commands.search.search_itunes", return_value=[mock_item]),
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("questionary.select") as mock_select,
     ):
@@ -169,7 +169,7 @@ def test_search_command_interactive_action_url(capsys: pytest.CaptureFixture) ->
 
 def test_search_command_interactive_action_inspect() -> None:
     """Test interactive search selecting 'Inspect Show & Episodes' action."""
-    from podcast_cli.cli.commands.search import search_command
+    from podcast_ctl.cli.commands.search import search_command
     import sys
 
     mock_item = PodcastSearchResult(
@@ -180,10 +180,10 @@ def test_search_command_interactive_action_inspect() -> None:
         episode_count=450,
     )
     with (
-        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch("podcast_ctl.cli.commands.search.search_itunes", return_value=[mock_item]),
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("questionary.select") as mock_select,
-        patch("podcast_cli.cli.commands.inspect.inspect_command") as mock_inspect,
+        patch("podcast_ctl.cli.commands.inspect.inspect_command") as mock_inspect,
     ):
         mock_select.return_value.ask.side_effect = [mock_item, "inspect"]
         search_command(query="Python", interactive=True)
@@ -192,7 +192,7 @@ def test_search_command_interactive_action_inspect() -> None:
 
 def test_search_command_interactive_action_transcribe() -> None:
     """Test interactive search selecting 'Transcribe Latest Episode' action."""
-    from podcast_cli.cli.commands.search import search_command
+    from podcast_ctl.cli.commands.search import search_command
     import sys
 
     mock_item = PodcastSearchResult(
@@ -203,10 +203,10 @@ def test_search_command_interactive_action_transcribe() -> None:
         episode_count=450,
     )
     with (
-        patch("podcast_cli.cli.commands.search.search_itunes", return_value=[mock_item]),
+        patch("podcast_ctl.cli.commands.search.search_itunes", return_value=[mock_item]),
         patch.object(sys.stdin, "isatty", return_value=True),
         patch("questionary.select") as mock_select,
-        patch("podcast_cli.cli.commands.transcribe.transcribe_command") as mock_transcribe,
+        patch("podcast_ctl.cli.commands.transcribe.transcribe_command") as mock_transcribe,
     ):
         mock_select.return_value.ask.side_effect = [mock_item, "transcribe"]
         search_command(query="Python", interactive=True)
@@ -253,7 +253,7 @@ def test_inspect_command_rss_feed() -> None:
         episodes=mock_episodes,
     )
 
-    with patch("podcast_cli.cli.commands.inspect.resolve_input", return_value=mock_resolved):
+    with patch("podcast_ctl.cli.commands.inspect.resolve_input", return_value=mock_resolved):
         result = runner.invoke(app, ["inspect", "https://example.com/feed.xml"])
         assert result.exit_code == 0
         assert "Tech Weekly" in result.stdout
@@ -269,7 +269,7 @@ def test_inspect_command_no_episodes() -> None:
         query="https://example.com/empty.xml",
         episodes=[],
     )
-    with patch("podcast_cli.cli.commands.inspect.resolve_input", return_value=mock_resolved):
+    with patch("podcast_ctl.cli.commands.inspect.resolve_input", return_value=mock_resolved):
         result = runner.invoke(app, ["inspect", "https://example.com/empty.xml"])
         assert result.exit_code == 0
         assert "No episodes found" in result.stdout
@@ -306,14 +306,14 @@ def test_transcribe_single_episode_success(tmp_path: Path) -> None:
     )
 
     with (
-        patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
         patch.object(
             StorageRepository,
             "save_transcript",
             wraps=StorageRepository().save_transcript,
         ),
         patch(
-            "podcast_cli.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
             new_callable=AsyncMock,
             return_value=mock_result,
         ) as mock_transcribe,
@@ -371,9 +371,9 @@ def test_transcribe_filter_by_index_and_title(tmp_path: Path) -> None:
     )
 
     with (
-        patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
         patch(
-            "podcast_cli.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
             new_callable=AsyncMock,
             return_value=mock_result,
         ),
@@ -427,8 +427,8 @@ def test_transcribe_abort_on_batch_prompt() -> None:
     )
 
     with (
-        patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
-        patch("podcast_cli.cli.commands.transcribe.prompt_batch_confirmation", return_value=False),
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch("podcast_ctl.cli.commands.transcribe.prompt_batch_confirmation", return_value=False),
     ):
         result = runner.invoke(app, ["transcribe", "https://showb.com/rss"])
         assert result.exit_code == 0
@@ -449,7 +449,7 @@ def test_transcribe_invalid_episode_filter() -> None:
         episodes=[mock_episode],
     )
 
-    with patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved):
+    with patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved):
         result = runner.invoke(app, ["transcribe", "https://showc.com/rss", "-e", "NonExistent"])
         assert result.exit_code == 1
         assert "No episode found matching filter" in (result.stderr or result.stdout or result.output)
@@ -600,7 +600,7 @@ def test_inspect_search_query_resolution() -> None:
         ],
     )
 
-    with patch("podcast_cli.cli.commands.inspect.resolve_input", side_effect=[mock_search_resolved, mock_rss_resolved]):
+    with patch("podcast_ctl.cli.commands.inspect.resolve_input", side_effect=[mock_search_resolved, mock_rss_resolved]):
         result = runner.invoke(app, ["inspect", "Discovered Show"])
         assert result.exit_code == 0
         assert "Resolved search query" in result.stdout
@@ -637,9 +637,9 @@ def test_transcribe_all_and_latest_flags(tmp_path: Path) -> None:
         )
 
     with (
-        patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
         patch(
-            "podcast_cli.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
             new_callable=AsyncMock,
             side_effect=mock_transcribe_side_effect,
         ) as mock_transcribe,
@@ -696,9 +696,9 @@ def test_transcribe_cloud_guardrail_declined() -> None:
     )
 
     with (
-        patch("podcast_cli.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
-        patch("podcast_cli.cli.commands.transcribe.prompt_batch_confirmation", return_value=True),
-        patch("podcast_cli.cli.commands.transcribe.prompt_cloud_cost_approval", return_value=(False, False)),
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch("podcast_ctl.cli.commands.transcribe.prompt_batch_confirmation", return_value=True),
+        patch("podcast_ctl.cli.commands.transcribe.prompt_cloud_cost_approval", return_value=(False, False)),
     ):
         result = runner.invoke(
             app,

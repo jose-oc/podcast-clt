@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 
-from podcast_cli.engines import (
+from podcast_ctl.engines import (
     BaseTranscriptionEngine,
     CloudTranscriptionEngine,
     EngineUnavailableError,
@@ -27,13 +27,13 @@ from podcast_cli.engines import (
     parse_timestamp_seconds,
     parse_vtt_content,
 )
-from podcast_cli.models import (
+from podcast_ctl.models import (
     EpisodeMapping,
     EpisodeMetadata,
     TranscriptResult,
     TranscriptSegment,
 )
-from podcast_cli.storage import Database, StorageRepository
+from podcast_ctl.storage import Database, StorageRepository
 
 
 # =============================================================================

@@ -1,5 +1,5 @@
 [project]
-name = "podcast-cli"
+name = "podcast-ctl"
 version = "0.1.0"
 description = "Fast, modular CLI to discover, inspect, and transcribe podcast episodes and YouTube shows."
 readme = "README.md"
@@ -31,7 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-podcast-cli = "podcast_cli.cli.main:app"
+podcast-ctl = "podcast_ctl.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,18 +1,18 @@
-# podcast-cli CLI Command Reference
+# podcast-ctl CLI Command Reference
 
-Comprehensive command-line reference and usage guide for `podcast-cli`.
+Comprehensive command-line reference and usage guide for `podcast-ctl`.
 
 ---
 
 ## Global Options
 
 ```bash
-podcast-cli [OPTIONS] COMMAND [ARGS]...
+podcast-ctl [OPTIONS] COMMAND [ARGS]...
 ```
 
 | Flag | Short | Description |
 | :--- | :--- | :--- |
-| `--version` | `-v` | Display `podcast-cli` version and exit. |
+| `--version` | `-v` | Display `podcast-ctl` version and exit. |
 | `--verbose` | | Enable verbose debug logging output. |
 | `--help` | | Show help message and exit. |
 
@@ -25,7 +25,7 @@ podcast-cli [OPTIONS] COMMAND [ARGS]...
 Search the Apple Podcasts / iTunes catalog for shows and feeds.
 
 ```bash
-podcast-cli search <query> [OPTIONS]
+podcast-ctl search <query> [OPTIONS]
 ```
 
 #### Arguments
@@ -38,10 +38,10 @@ podcast-cli search <query> [OPTIONS]
 #### Examples
 ```bash
 # Search for shows matching "Latent Space"
-podcast-cli search "Latent Space"
+podcast-ctl search "Latent Space"
 
 # Search with custom limit without interactive prompt
-podcast-cli search "Huberman Lab" --limit 5 --no-interactive
+podcast-ctl search "Huberman Lab" --limit 5 --no-interactive
 ```
 
 ---
@@ -51,7 +51,7 @@ podcast-cli search "Huberman Lab" --limit 5 --no-interactive
 Inspect an RSS feed, show title, YouTube video, or local audio file. Performs pre-flight workload estimation and tier analysis without downloading or transcribing.
 
 ```bash
-podcast-cli inspect <input_source> [OPTIONS]
+podcast-ctl inspect <input_source> [OPTIONS]
 ```
 
 #### Arguments
@@ -64,13 +64,13 @@ podcast-cli inspect <input_source> [OPTIONS]
 #### Examples
 ```bash
 # Inspect an RSS feed
-podcast-cli inspect "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl inspect "https://feeds.simplecast.com/82GLSDrl"
 
 # Inspect by show title (auto-resolves via iTunes search)
-podcast-cli inspect "All-In Podcast"
+podcast-ctl inspect "All-In Podcast"
 
 # Inspect a local audio recording
-podcast-cli inspect ~/Recordings/interview.mp3
+podcast-ctl inspect ~/Recordings/interview.mp3
 ```
 
 ---
@@ -80,7 +80,7 @@ podcast-cli inspect ~/Recordings/interview.mp3
 Transcribe podcast episodes, YouTube videos, or local audio files with multi-tier fallback and multi-format export.
 
 ```bash
-podcast-cli transcribe <input_source> [OPTIONS]
+podcast-ctl transcribe <input_source> [OPTIONS]
 ```
 
 #### Arguments
@@ -108,19 +108,19 @@ podcast-cli transcribe <input_source> [OPTIONS]
 #### Examples
 ```bash
 # Transcribe the latest episode of a show into Markdown and Text
-podcast-cli transcribe "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl transcribe "https://feeds.simplecast.com/82GLSDrl"
 
 # Transcribe specific episode by title search using small Whisper model
-podcast-cli transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
+podcast-ctl transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
 
 # Transcribe latest 3 episodes and export all formats without interactive prompts
-podcast-cli transcribe "Hardcore History" --latest 3 --format all --yes
+podcast-ctl transcribe "Hardcore History" --latest 3 --format all --yes
 
 # Transcribe a local audio recording directly
-podcast-cli transcribe ./meeting.m4a -o ./notes -f markdown
+podcast-ctl transcribe ./meeting.m4a -o ./notes -f markdown
 
 # Transcribe a YouTube video
-podcast-cli transcribe "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+podcast-ctl transcribe "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
 ---
@@ -130,7 +130,7 @@ podcast-cli transcribe "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 Manage learned Show $\leftrightarrow$ YouTube Channel and Episode $\leftrightarrow$ YouTube Video associations.
 
 ```bash
-podcast-cli mapping COMMAND [OPTIONS]
+podcast-ctl mapping COMMAND [OPTIONS]
 ```
 
 #### Subcommands
@@ -138,31 +138,31 @@ podcast-cli mapping COMMAND [OPTIONS]
 #### `mapping list`
 List all stored mappings in formatted tables.
 ```bash
-podcast-cli mapping list [--show <show_id>]
+podcast-ctl mapping list [--show <show_id>]
 ```
 
 #### `mapping add show`
 Associate a podcast RSS feed with a YouTube channel.
 ```bash
-podcast-cli mapping add show <feed_url> <youtube_channel_url> [--title <title>]
+podcast-ctl mapping add show <feed_url> <youtube_channel_url> [--title <title>]
 ```
 
 #### `mapping add episode`
 Associate a specific podcast episode with a direct YouTube video URL.
 ```bash
-podcast-cli mapping add episode <show_id> <episode_id> <youtube_video_url>
+podcast-ctl mapping add episode <show_id> <episode_id> <youtube_video_url>
 ```
 
 #### `mapping remove show`
 Delete a Show $\leftrightarrow$ YouTube Channel mapping.
 ```bash
-podcast-cli mapping remove show <feed_url>
+podcast-ctl mapping remove show <feed_url>
 ```
 
 #### `mapping remove episode`
 Delete an Episode $\leftrightarrow$ YouTube Video mapping.
 ```bash
-podcast-cli mapping remove episode <show_id> <episode_id>
+podcast-ctl mapping remove episode <show_id> <episode_id>
 ```
 
 ---
@@ -172,7 +172,7 @@ podcast-cli mapping remove episode <show_id> <episode_id>
 Inspect, list, and manage SQLite cached transcripts and storage.
 
 ```bash
-podcast-cli cache COMMAND [OPTIONS]
+podcast-ctl cache COMMAND [OPTIONS]
 ```
 
 #### Subcommands
@@ -180,19 +180,19 @@ podcast-cli cache COMMAND [OPTIONS]
 #### `cache stats`
 Display database path, disk usage, and entity counts.
 ```bash
-podcast-cli cache stats
+podcast-ctl cache stats
 ```
 
 #### `cache list`
 List stored transcripts in cache.
 ```bash
-podcast-cli cache list [--show <show_id>] [--limit <N>]
+podcast-ctl cache list [--show <show_id>] [--limit <N>]
 ```
 
 #### `cache clean`
 Clear cached transcripts from SQLite.
 ```bash
-podcast-cli cache clean [--show <show_id>] [--yes]
+podcast-ctl cache clean [--show <show_id>] [--yes]
 ```
 
 ---
@@ -201,7 +201,7 @@ podcast-cli cache clean [--show <show_id>] [--yes]
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `PODCAST_CLI_DB_PATH` | Custom path to SQLite database file. | `~/.local/share/podcast-cli/podcast_cli.db` |
+| `PODCAST_CTL_DB_PATH` | Custom path to SQLite database file. | `~/.local/share/podcast-ctl/podcast_ctl.db` |
 | `GROQ_API_KEY` | API key for Groq Cloud Whisper API. | None |
 | `OPENAI_API_KEY` | API key for OpenAI Whisper API. | None |
 

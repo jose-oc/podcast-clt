@@ -42,3 +42,4 @@ htmlcov/
 *.sqlite3
 transcripts/
 audio_cache/
+temp_test_results/

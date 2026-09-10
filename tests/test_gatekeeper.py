@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-from podcast_cli.gatekeeper import (
+from podcast_ctl.gatekeeper import (
     KnowledgeLearner,
     PreFlightInspector,
     PreFlightSummary,
@@ -16,13 +16,13 @@ from podcast_cli.gatekeeper import (
     prompt_cloud_cost_approval,
     prompt_youtube_mapping,
 )
-from podcast_cli.models import (
+from podcast_ctl.models import (
     EpisodeMetadata,
     TranscriptResult,
     TranscriptSegment,
 )
-from podcast_cli.storage import Database, StorageRepository
-from podcast_cli.ui.console import UIConsole
+from podcast_ctl.storage import Database, StorageRepository
+from podcast_ctl.ui.console import UIConsole
 
 
 # =============================================================================
