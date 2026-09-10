@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from podcast_ctl.exporters.base import BaseExporter, format_timestamp
 from podcast_ctl.models.transcript import TranscriptResult, TranscriptSegment
 

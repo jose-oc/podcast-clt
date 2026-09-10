@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
+
 import typer
 
 from podcast_ctl.discovery.resolver import resolve_input
@@ -25,7 +26,7 @@ from podcast_ctl.ui.console import console
 
 def _select_episodes(
     all_episodes: list[EpisodeMetadata],
-    episode_filter: Optional[str] = None,
+    episode_filter: str | None = None,
     all_flag: bool = False,
     latest: int = 1,
 ) -> list[EpisodeMetadata]:
@@ -69,7 +70,7 @@ def transcribe_command(
         ),
     ],
     episode: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--episode",
             "-e",

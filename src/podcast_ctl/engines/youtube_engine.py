@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -17,7 +17,6 @@ from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
     EngineUnavailableError,
     TranscriptNotFoundError,
-    TranscriptionEngineError,
 )
 from podcast_ctl.engines.rss_engine import clean_vtt_text, parse_json_transcript, parse_vtt_content
 from podcast_ctl.models.transcript import (
@@ -34,7 +33,7 @@ YOUTUBE_ID_PATTERNS = [
 ]
 
 
-def extract_youtube_video_id(url_or_id: Optional[str]) -> Optional[str]:
+def extract_youtube_video_id(url_or_id: str | None) -> str | None:
     """Extract an 11-character YouTube video ID from a URL or raw ID string."""
     if not url_or_id:
         return None
@@ -53,7 +52,7 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
     name: str = "youtube"
     tier: str = "youtube"
 
-    def __init__(self, preferred_languages: Optional[list[str]] = None) -> None:
+    def __init__(self, preferred_languages: list[str] | None = None) -> None:
         self.preferred_languages = preferred_languages or ["en", "en-US", "en-GB"]
 
     def is_available(self) -> bool:
@@ -70,15 +69,15 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
         except ImportError:
             return False
 
-    def resolve_video_id(self, episode: EpisodeMetadata, kwargs: dict[str, Any]) -> Optional[str]:
+    def resolve_video_id(self, episode: EpisodeMetadata, kwargs: dict[str, Any]) -> str | None:
         """Find the YouTube video ID from kwargs or episode metadata."""
         # 1. Explicit in kwargs
-        if "video_id" in kwargs and kwargs["video_id"]:
+        if kwargs.get("video_id"):
             vid = extract_youtube_video_id(str(kwargs["video_id"]))
             if vid:
                 return vid
 
-        if "youtube_url" in kwargs and kwargs["youtube_url"]:
+        if kwargs.get("youtube_url"):
             vid = extract_youtube_video_id(str(kwargs["youtube_url"]))
             if vid:
                 return vid
@@ -99,13 +98,17 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
     def _fetch_via_youtube_transcript_api(
         self, video_id: str, languages: list[str]
     ) -> list[TranscriptSegment]:
-        """Extract captions using the youtube_transcript_api library."""
+        """Extract captions using the youtube_transcript_api library.
+
+        Supports youtube-transcript-api >= 1.0 (instance-based client whose
+        fetched snippets expose ``start``/``duration``/``text`` attributes).
+        """
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
         except ImportError as exc:
             raise EngineUnavailableError("youtube-transcript-api is not installed.") from exc
 
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        transcript_list = YouTubeTranscriptApi().list(video_id)
 
         transcript = None
         # 1. Try manual subtitles in preferred languages
@@ -126,16 +129,18 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
             try:
                 transcript = next(iter(transcript_list))
             except StopIteration:
-                raise TranscriptNotFoundError(f"No transcripts found for YouTube video {video_id}.")
+                raise TranscriptNotFoundError(
+                    f"No transcripts found for YouTube video {video_id}."
+                ) from None
 
         raw_items = transcript.fetch()
         segments: list[TranscriptSegment] = []
 
         for item in raw_items:
-            start = round(float(item.get("start", 0.0)), 3)
-            duration = float(item.get("duration", 0.0))
+            start = round(float(item.start), 3)
+            duration = float(item.duration)
             end = round(start + duration, 3)
-            text, speaker = clean_vtt_text(str(item.get("text", "")))
+            text, speaker = clean_vtt_text(str(item.text))
             if text:
                 segments.append(
                     TranscriptSegment(
@@ -175,7 +180,7 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
         auto_captions = info.get("automatic_captions") or {}
 
         # Look for subtitle URL
-        target_sub_url: Optional[str] = None
+        target_sub_url: str | None = None
         target_ext: str = "json3"
 
         for lang in languages:
@@ -204,7 +209,7 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
         if not target_sub_url:
             # Check any available subtitle
             all_subs = {**subtitles, **auto_captions}
-            for lang, sub_list in all_subs.items():
+            for _lang, sub_list in all_subs.items():
                 for sub in sub_list:
                     if sub.get("url"):
                         target_sub_url = sub.get("url")

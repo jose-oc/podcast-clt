@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import sys
-from typing import Annotated, Optional
+from typing import Annotated
+
 import questionary
-from rich.table import Table
 import typer
+from rich.table import Table
 
 from podcast_ctl.storage.repository import StorageRepository
 from podcast_ctl.ui.console import console
@@ -58,7 +59,7 @@ def cache_stats() -> None:
 @cache_app.command("list")
 def cache_list(
     show: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--show",
             "-s",
@@ -123,7 +124,7 @@ def cache_list(
 @cache_app.command("clean")
 def cache_clean(
     show: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--show",
             "-s",

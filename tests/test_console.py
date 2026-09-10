@@ -8,7 +8,6 @@ from rich.text import Text
 
 from podcast_ctl.ui.console import (
     UIConsole,
-    console as global_console,
     error,
     info,
     panel,
@@ -17,6 +16,9 @@ from podcast_ctl.ui.console import (
     success,
     table,
     warning,
+)
+from podcast_ctl.ui.console import (
+    console as global_console,
 )
 from podcast_ctl.ui.theme import THEME_STYLES, custom_theme
 

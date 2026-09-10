@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-import httpx
+
 import pytest
 import respx
 
@@ -34,7 +34,6 @@ from podcast_ctl.models import (
     TranscriptSegment,
 )
 from podcast_ctl.storage import Database, StorageRepository
-
 
 # =============================================================================
 # Fixtures
@@ -312,12 +311,6 @@ class TestYouTubeEngine:
         )
 
         engine = YouTubeTranscriptionEngine()
-
-        # Mock YouTubeTranscriptApi
-        mock_raw_items = [
-            {"start": 0.0, "duration": 4.5, "text": "[Host] Welcome to Huberman Lab."},
-            {"start": 4.5, "duration": 5.0, "text": "Today we discuss dopamine."},
-        ]
 
         with patch.object(engine, "_fetch_via_youtube_transcript_api", return_value=[
             TranscriptSegment(start=0.0, end=4.5, text="Welcome to Huberman Lab.", speaker="Host"),

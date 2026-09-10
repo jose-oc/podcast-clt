@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Optional, Union
+from typing import Any
 from urllib.parse import parse_qs, urlparse
+
 import yt_dlp
 
 from podcast_ctl.models.transcript import EpisodeMetadata
@@ -40,7 +41,7 @@ YOUTUBE_CHANNEL_PATH_REGEX = re.compile(
 )
 
 
-def extract_youtube_video_id(url_or_id: str) -> Optional[str]:
+def extract_youtube_video_id(url_or_id: str) -> str | None:
     """Extract an 11-character YouTube video ID from a URL or raw ID string.
 
     Args:
@@ -202,7 +203,7 @@ def parse_youtube_url(url: str) -> dict[str, Any]:
 def search_youtube_candidates(
     query: str,
     max_results: int = 5,
-    custom_ydl_opts: Optional[dict[str, Any]] = None,
+    custom_ydl_opts: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Search YouTube for candidate videos matching a query (e.g. show title + episode title).
 
@@ -282,7 +283,7 @@ def search_youtube_candidates(
 
 def get_youtube_video_info(
     url_or_id: str,
-    custom_ydl_opts: Optional[dict[str, Any]] = None,
+    custom_ydl_opts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Extract YouTube video metadata and available subtitle tracks without downloading media.
 
@@ -312,7 +313,7 @@ def get_youtube_video_info(
 
 def get_youtube_subtitles_metadata(
     url_or_id: str,
-    custom_ydl_opts: Optional[dict[str, Any]] = None,
+    custom_ydl_opts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Inspect and extract available subtitle / closed-caption tracks for a YouTube video.
 
@@ -359,7 +360,7 @@ def get_youtube_subtitles_metadata(
 
 
 def youtube_video_to_metadata(
-    url_or_info: Union[str, dict[str, Any]],
+    url_or_info: str | dict[str, Any],
 ) -> EpisodeMetadata:
     """Convert a YouTube URL or yt-dlp extracted info dictionary into an EpisodeMetadata object.
 

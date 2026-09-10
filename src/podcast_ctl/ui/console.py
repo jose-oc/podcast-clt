@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from typing import Any, Generator, Sequence
+from typing import Any
 
 from rich.console import Console, RenderableType
 from rich.panel import Panel
@@ -12,6 +13,9 @@ from rich.table import Table
 from rich.text import Text
 
 from podcast_ctl.ui.theme import custom_theme
+
+# isinstance() needs concrete classes; RenderableType is a typing alias, so keep this Any-typed.
+_RENDERABLE_TYPES: Any = (Text, RenderableType)
 
 
 class UIConsole:
@@ -186,7 +190,7 @@ class UIConsole:
 
         if rows:
             for row in rows:
-                tbl.add_row(*[str(cell) if not isinstance(cell, (Text, RenderableType)) else cell for cell in row])
+                tbl.add_row(*[str(cell) if not isinstance(cell, _RENDERABLE_TYPES) else cell for cell in row])
 
         if print_out:
             self.stdout_console.print(tbl)

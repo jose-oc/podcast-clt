@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Optional, Union
+from typing import Any
+
 import defusedxml.ElementTree as ET
 import feedparser
 import httpx
@@ -29,16 +30,16 @@ class ShowMetadata(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     title: str = Field(..., description="Podcast show title")
-    description: Optional[str] = Field(default=None, description="Show description or summary")
-    feed_url: Optional[str] = Field(default=None, description="Direct RSS feed URL")
-    link: Optional[str] = Field(default=None, description="Show website or homepage link")
-    author: Optional[str] = Field(default=None, description="Author / host / publisher")
-    image_url: Optional[str] = Field(default=None, description="Artwork image URL")
-    language: Optional[str] = Field(default=None, description="Feed primary language")
+    description: str | None = Field(default=None, description="Show description or summary")
+    feed_url: str | None = Field(default=None, description="Direct RSS feed URL")
+    link: str | None = Field(default=None, description="Show website or homepage link")
+    author: str | None = Field(default=None, description="Author / host / publisher")
+    image_url: str | None = Field(default=None, description="Artwork image URL")
+    language: str | None = Field(default=None, description="Feed primary language")
     total_episodes: int = Field(default=0, description="Total number of parsed episodes")
 
 
-def parse_duration(duration_raw: Optional[Union[str, int, float]]) -> Optional[float]:
+def parse_duration(duration_raw: Any) -> float | None:
     """Parse various duration formats into total seconds (float).
 
     Supported formats:
@@ -137,14 +138,14 @@ def _extract_podcast_transcripts(item_element: ET.Element) -> list[dict[str, Any
 
 
 def _parse_xml_element_tree(
-    xml_content: str, feed_url: Optional[str] = None
+    xml_content: str, feed_url: str | None = None
 ) -> tuple[ShowMetadata, list[EpisodeMetadata]]:
     """Parse RSS feed XML content using defusedxml ElementTree."""
     root = ET.fromstring(xml_content.encode("utf-8") if isinstance(xml_content, str) else xml_content)
     root_tag = _get_local_tag(root.tag).lower()
 
     # Handle standard RSS (<rss><channel>...</channel></rss>) or Atom (<feed>...)
-    channel: Optional[ET.Element] = None
+    channel: ET.Element | None = None
     if root_tag == "rss":
         for child in root:
             if _get_local_tag(child.tag).lower() == "channel":
@@ -157,11 +158,11 @@ def _parse_xml_element_tree(
 
     # Extract show metadata
     show_title = "Untitled Podcast"
-    show_desc: Optional[str] = None
-    show_link: Optional[str] = None
-    show_author: Optional[str] = None
-    show_image: Optional[str] = None
-    show_lang: Optional[str] = None
+    show_desc: str | None = None
+    show_link: str | None = None
+    show_author: str | None = None
+    show_image: str | None = None
+    show_lang: str | None = None
 
     for elem in channel:
         ltag = _get_local_tag(elem.tag).lower()
@@ -197,10 +198,10 @@ def _parse_xml_element_tree(
 
         item_elem = child
         ep_title = "Untitled Episode"
-        ep_guid: Optional[str] = None
-        ep_audio_url: Optional[str] = None
-        ep_duration_raw: Optional[str] = None
-        ep_pub_date: Optional[str] = None
+        ep_guid: str | None = None
+        ep_audio_url: str | None = None
+        ep_duration_raw: str | None = None
+        ep_pub_date: str | None = None
 
         # Extract Podcasting 2.0 transcripts
         ep_transcripts = _extract_podcast_transcripts(item_elem)
@@ -260,7 +261,7 @@ def _parse_xml_element_tree(
 
 
 def _parse_with_feedparser_fallback(
-    xml_content: str, feed_url: Optional[str] = None
+    xml_content: str, feed_url: str | None = None
 ) -> tuple[ShowMetadata, list[EpisodeMetadata]]:
     """Fallback feed parser using feedparser library."""
     parsed = feedparser.parse(xml_content)
@@ -279,7 +280,7 @@ def _parse_with_feedparser_fallback(
         ep_title = entry.get("title", "Untitled Episode")
         ep_guid = entry.get("id") or entry.get("guid") or entry.get("link")
 
-        audio_url: Optional[str] = None
+        audio_url: str | None = None
         for enc in entry.get("enclosures", []):
             if isinstance(enc, dict) and enc.get("href"):
                 audio_url = enc["href"]
@@ -324,7 +325,7 @@ def _parse_with_feedparser_fallback(
 
 
 def parse_feed_content(
-    xml_content: str, feed_url: Optional[str] = None
+    xml_content: str, feed_url: str | None = None
 ) -> tuple[ShowMetadata, list[EpisodeMetadata]]:
     """Parse RSS/Atom XML feed content into ShowMetadata and list of EpisodeMetadata.
 
@@ -353,7 +354,7 @@ def parse_feed_content(
 
 def fetch_feed(
     feed_url: str,
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     timeout: float = 15.0,
 ) -> str:
     """Fetch raw XML content of an RSS feed.
@@ -384,7 +385,7 @@ def fetch_feed(
 
 def fetch_and_parse_feed(
     feed_url: str,
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     timeout: float = 15.0,
 ) -> tuple[ShowMetadata, list[EpisodeMetadata]]:
     """Fetch an RSS feed from a URL and parse its show and episode metadata.

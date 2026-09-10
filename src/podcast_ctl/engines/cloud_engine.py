@@ -6,12 +6,13 @@ Provides ultra-fast cloud inference via OpenAI-compatible Whisper endpoints
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from pathlib import Path
 import shutil
 import tempfile
-from typing import Any, Literal, Optional
+from pathlib import Path
+from typing import Any, Literal
 
 import httpx
 
@@ -41,9 +42,9 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
     def __init__(
         self,
         provider: Literal["groq", "openai", "custom"] | str = "groq",
-        api_key: Optional[str] = None,
-        model: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
         timeout: float = 300.0,
     ) -> None:
         self.provider = provider.lower()
@@ -53,7 +54,7 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
         self.timeout = timeout
 
     @property
-    def api_key(self) -> Optional[str]:
+    def api_key(self) -> str | None:
         """Resolve API key from explicit value or environment variables."""
         if self._explicit_api_key:
             return self._explicit_api_key
@@ -96,21 +97,21 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             async with client.stream("GET", url) as response:
                 response.raise_for_status()
-                with open(target_path, "wb") as f:
+                with open(target_path, "wb") as f:  # noqa: ASYNC230 - streamed download; sync file write kept simple
                     async for chunk in response.aiter_bytes(chunk_size=65536):
                         f.write(chunk)
 
     async def transcribe(
         self,
         episode: EpisodeMetadata,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
         **kwargs: Any,
     ) -> TranscriptResult:
         """Send audio to cloud transcription API and parse verbose_json segments."""
         api_key = kwargs.get("api_key") or self.api_key
         if not api_key:
             raise EngineUnavailableError(
-                f"Cloud transcription requires an API key. Set GROQ_API_KEY or OPENAI_API_KEY env var."
+                "Cloud transcription requires an API key. Set GROQ_API_KEY or OPENAI_API_KEY env var."
             )
 
         model = kwargs.get("model") or self.default_model
@@ -122,11 +123,11 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
 
         # Audio file resolution
         local_path_arg = kwargs.get("audio_path") or kwargs.get("local_path")
-        temp_dir: Optional[str] = None
-        audio_file_path: Optional[Path] = None
+        temp_dir: str | None = None
+        audio_file_path: Path | None = None
 
         try:
-            if local_path_arg and Path(local_path_arg).exists():
+            if local_path_arg and Path(local_path_arg).exists():  # noqa: ASYNC240 - cheap metadata check
                 audio_file_path = Path(local_path_arg)
             elif episode.audio_url and (
                 episode.audio_url.startswith("http://") or episode.audio_url.startswith("https://")
@@ -142,7 +143,7 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
                 audio_file_path = Path(temp_dir) / f"audio{ext}"
                 logger.info(f"Downloading audio from {episode.audio_url} for cloud transcription...")
                 await self._download_audio(episode.audio_url, audio_file_path)
-            elif episode.audio_url and Path(episode.audio_url).exists():
+            elif episode.audio_url and Path(episode.audio_url).exists():  # noqa: ASYNC240 - cheap metadata check
                 audio_file_path = Path(episode.audio_url)
             else:
                 raise TranscriptionEngineError(
@@ -174,8 +175,7 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
 
             async def _send_request(http_client: httpx.AsyncClient) -> TranscriptResult:
                 assert audio_file_path is not None
-                with open(audio_file_path, "rb") as f:
-                    file_bytes = f.read()
+                file_bytes = await asyncio.to_thread(audio_file_path.read_bytes)
 
                 files = {
                     "file": (filename, file_bytes, mime_type),
@@ -245,7 +245,7 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
                     return await _send_request(http_client)
 
         finally:
-            if not keep_audio and temp_dir is not None and os.path.exists(temp_dir):
+            if not keep_audio and temp_dir is not None and os.path.exists(temp_dir):  # noqa: ASYNC240 - best-effort cleanup
                 try:
                     shutil.rmtree(temp_dir, ignore_errors=True)
                 except Exception as exc:

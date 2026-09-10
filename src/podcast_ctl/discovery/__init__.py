@@ -43,35 +43,30 @@ from podcast_ctl.discovery.youtube import (
 )
 
 __all__ = [
-    # iTunes
-    "ITUNES_SEARCH_URL",
     "ITUNES_LOOKUP_URL",
-    "PodcastSearchResult",
+    "ITUNES_SEARCH_URL",
+    "SUPPORTED_AUDIO_EXTENSIONS",
     "ItunesPodcast",
-    "search_itunes",
-    "lookup_itunes",
-    "search_podcast",
-    "lookup_podcast",
-    # RSS & Podcasting 2.0
+    "PodcastSearchResult",
+    "ResolvedSource",
     "ShowMetadata",
+    "extract_youtube_video_id",
+    "fetch_and_parse_feed",
+    "fetch_feed",
+    "get_youtube_subtitles_metadata",
+    "get_youtube_video_info",
+    "inspect_local_file",
+    "is_supported_audio_file",
+    "is_youtube_url",
+    "lookup_itunes",
+    "lookup_podcast",
     "parse_duration",
     "parse_feed_content",
-    "fetch_feed",
-    "fetch_and_parse_feed",
-    # YouTube
-    "extract_youtube_video_id",
-    "is_youtube_url",
     "parse_youtube_url",
-    "search_youtube_candidates",
-    "get_youtube_video_info",
-    "get_youtube_subtitles_metadata",
-    "youtube_video_to_metadata",
-    # Local Files
-    "SUPPORTED_AUDIO_EXTENSIONS",
-    "is_supported_audio_file",
     "probe_media_file",
-    "inspect_local_file",
-    # Unified Resolver
-    "ResolvedSource",
     "resolve_input",
+    "search_itunes",
+    "search_podcast",
+    "search_youtube_candidates",
+    "youtube_video_to_metadata",
 ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import pytest
 import yaml
 
@@ -424,7 +425,7 @@ def test_export_manager_export_all_all_formats(sample_result: TranscriptResult, 
     saved = manager.export_all(sample_result, output_dir=tmp_path, formats="all")
 
     assert set(saved.keys()) == {"markdown", "prose", "srt", "vtt", "json"}
-    for fmt, path in saved.items():
+    for path in saved.values():
         assert path.exists()
         assert path.stat().st_size > 0
 

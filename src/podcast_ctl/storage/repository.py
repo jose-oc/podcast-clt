@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from podcast_ctl.models.knowledge import EpisodeMapping, ShowMapping, UserPreference
 from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult
@@ -14,7 +14,7 @@ from podcast_ctl.storage.db import Database
 class StorageRepository:
     """Repository abstraction over SQLite database for podcast-ctl domain entities."""
 
-    def __init__(self, db: Optional[Union[Database, str, Path]] = None) -> None:
+    def __init__(self, db: Database | str | Path | None = None) -> None:
         if isinstance(db, Database):
             self.db = db
         else:
@@ -27,10 +27,10 @@ class StorageRepository:
 
     def save_show(
         self,
-        metadata: Union[dict[str, Any], str],
-        title: Optional[str] = None,
-        feed_url: Optional[str] = None,
-        metadata_dict: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | str,
+        title: str | None = None,
+        feed_url: str | None = None,
+        metadata_dict: dict[str, Any] | None = None,
     ) -> None:
         """Save or update a podcast show record."""
         if isinstance(metadata, dict):
@@ -61,7 +61,7 @@ class StorageRepository:
                 (str(show_id), str(show_title), show_feed_url, meta_json),
             )
 
-    def get_show(self, show_id_or_feed_url: str) -> Optional[dict[str, Any]]:
+    def get_show(self, show_id_or_feed_url: str) -> dict[str, Any] | None:
         """Retrieve a show by ID or RSS feed URL."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -118,8 +118,10 @@ class StorageRepository:
     # Episodes CRUD
     # -------------------------------------------------------------------------
 
-    def save_episode(self, episode_data: Union[dict[str, Any], EpisodeMetadata]) -> None:
+    def save_episode(self, episode_data: dict[str, Any] | EpisodeMetadata) -> None:
         """Save or update an episode record."""
+        episode_id: str | None
+        title: str | None
         if isinstance(episode_data, EpisodeMetadata):
             show_id = episode_data.effective_show_id
             episode_id = episode_data.episode_id
@@ -156,7 +158,7 @@ class StorageRepository:
                 (str(episode_id), str(show_id), str(title), duration, audio_url, published_date, meta_json),
             )
 
-    def get_episode(self, show_id: str, episode_id: str) -> Optional[dict[str, Any]]:
+    def get_episode(self, show_id: str, episode_id: str) -> dict[str, Any] | None:
         """Retrieve an episode record by show ID and episode ID."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -189,7 +191,7 @@ class StorageRepository:
     # Transcripts Cache CRUD
     # -------------------------------------------------------------------------
 
-    def save_transcript(self, result: TranscriptResult, show_id: Optional[str] = None) -> None:
+    def save_transcript(self, result: TranscriptResult, show_id: str | None = None) -> None:
         """Save a transcript result into SQLite cache and update episodes metadata."""
         effective_show_id = show_id or result.metadata.effective_show_id
         episode_id = result.metadata.episode_id
@@ -211,7 +213,7 @@ class StorageRepository:
         # Also store/update episode metadata
         self.save_episode(result.metadata)
 
-    def get_transcript(self, show_id: str, episode_id: str) -> Optional[TranscriptResult]:
+    def get_transcript(self, show_id: str, episode_id: str) -> TranscriptResult | None:
         """Retrieve a cached TranscriptResult by show ID and episode ID."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -223,7 +225,7 @@ class StorageRepository:
                 return None
             return TranscriptResult.model_validate_json(row["transcript_json"])
 
-    def list_transcripts(self, show_id: Optional[str] = None) -> list[TranscriptResult]:
+    def list_transcripts(self, show_id: str | None = None) -> list[TranscriptResult]:
         """List all cached TranscriptResults, optionally filtered by show_id."""
         with self.db.connection() as conn:
             if show_id is not None:
@@ -253,7 +255,7 @@ class StorageRepository:
             )
             return cursor.rowcount > 0
 
-    def clear_cache(self, show_id: Optional[str] = None) -> int:
+    def clear_cache(self, show_id: str | None = None) -> int:
         """Clear cached transcripts for all shows or a specific show. Returns count of deleted transcripts."""
         with self.db.connection() as conn:
             if show_id is not None:
@@ -286,7 +288,7 @@ class StorageRepository:
                 (mapping.feed_url, mapping.youtube_channel_url, meta_json),
             )
 
-    def get_show_mapping(self, feed_url: str) -> Optional[ShowMapping]:
+    def get_show_mapping(self, feed_url: str) -> ShowMapping | None:
         """Retrieve a ShowMapping by feed URL."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -367,7 +369,7 @@ class StorageRepository:
                 (key, mapping.youtube_video_url, confirmed_int, meta_json),
             )
 
-    def get_episode_mapping(self, show_id: str, episode_id: str) -> Optional[EpisodeMapping]:
+    def get_episode_mapping(self, show_id: str, episode_id: str) -> EpisodeMapping | None:
         """Retrieve an EpisodeMapping by show ID and episode ID."""
         key = f"{show_id}::{episode_id}"
         with self.db.connection() as conn:
@@ -393,7 +395,7 @@ class StorageRepository:
                 confirmed_by_user=bool(row["confirmed_by_user"]),
             )
 
-    def list_episode_mappings(self, show_id: Optional[str] = None) -> list[EpisodeMapping]:
+    def list_episode_mappings(self, show_id: str | None = None) -> list[EpisodeMapping]:
         """List all saved EpisodeMappings, optionally filtered by show_id."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -446,7 +448,7 @@ class StorageRepository:
             except json.JSONDecodeError:
                 return row["value_json"]
 
-    def set_preference(self, key: Union[str, UserPreference], value: Any = None) -> None:
+    def set_preference(self, key: str | UserPreference, value: Any = None) -> None:
         """Set or update a user preference key-value pair."""
         if isinstance(key, UserPreference):
             pref_key = key.key

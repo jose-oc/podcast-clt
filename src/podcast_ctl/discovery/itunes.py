@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Union
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,15 +20,15 @@ class PodcastSearchResult(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    collection_id: Union[int, str] = Field(..., description="Unique iTunes collection or podcast ID")
+    collection_id: int | str = Field(..., description="Unique iTunes collection or podcast ID")
     title: str = Field(..., description="Podcast show title")
     author: str = Field(default="", description="Podcast author / artist name")
-    feed_url: Optional[str] = Field(default=None, description="Direct RSS feed URL")
-    artwork_url: Optional[str] = Field(default=None, description="Artwork image URL")
+    feed_url: str | None = Field(default=None, description="Direct RSS feed URL")
+    artwork_url: str | None = Field(default=None, description="Artwork image URL")
     episode_count: int = Field(default=0, description="Total episode count")
     genres: list[str] = Field(default_factory=list, description="List of genre names")
-    country: Optional[str] = Field(default=None, description="Country code (e.g., USA)")
-    release_date: Optional[str] = Field(default=None, description="Latest release date string")
+    country: str | None = Field(default=None, description="Country code (e.g., USA)")
+    release_date: str | None = Field(default=None, description="Latest release date string")
 
 
 # Alias for backward/naming compatibility
@@ -71,7 +72,7 @@ def _parse_itunes_item(item: dict[str, Any]) -> PodcastSearchResult:
 def search_itunes(
     query: str,
     limit: int = 10,
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     timeout: float = 10.0,
 ) -> list[PodcastSearchResult]:
     """Search Apple Podcasts via iTunes Search API.
@@ -119,10 +120,10 @@ def search_itunes(
 
 
 def lookup_itunes(
-    collection_id: Union[int, str],
-    client: Optional[httpx.Client] = None,
+    collection_id: int | str,
+    client: httpx.Client | None = None,
     timeout: float = 10.0,
-) -> Optional[PodcastSearchResult]:
+) -> PodcastSearchResult | None:
     """Lookup a single podcast by its iTunes collection ID.
 
     Args:

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import sys
-from typing import Annotated, Optional
+from typing import Annotated
+
 import questionary
-from rich.table import Table
 import typer
+from rich.table import Table
 
 from podcast_ctl.discovery.itunes import search_itunes
 from podcast_ctl.ui.console import console

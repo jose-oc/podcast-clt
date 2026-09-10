@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 import yaml
 
 from podcast_ctl.exporters.base import BaseExporter, format_duration, format_timestamp
@@ -50,7 +49,7 @@ class MarkdownExporter(BaseExporter):
 
         blocks: list[str] = []
         current_group: list[str] = []
-        current_speaker: Optional[str] = None
+        current_speaker: str | None = None
         group_start: float = 0.0
         prev_end: float = 0.0
 
@@ -83,7 +82,7 @@ class MarkdownExporter(BaseExporter):
 
         return "\n\n".join(blocks)
 
-    def _format_block(self, start_seconds: float, speaker: Optional[str], text_parts: list[str]) -> str:
+    def _format_block(self, start_seconds: float, speaker: str | None, text_parts: list[str]) -> str:
         ts = format_timestamp(start_seconds, always_include_hours=True)
         merged_text = " ".join(text_parts)
         if speaker and speaker.strip():

@@ -8,10 +8,10 @@ from podcast_ctl.models.transcript import (
 )
 
 __all__ = [
-    "TranscriptSegment",
-    "EpisodeMetadata",
-    "TranscriptResult",
-    "ShowMapping",
     "EpisodeMapping",
+    "EpisodeMetadata",
+    "ShowMapping",
+    "TranscriptResult",
+    "TranscriptSegment",
     "UserPreference",
 ]

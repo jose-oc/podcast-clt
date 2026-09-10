@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from podcast_ctl.exporters.base import BaseExporter
 from podcast_ctl.models.transcript import TranscriptResult
@@ -66,16 +65,16 @@ class ProseExporter(BaseExporter):
         if not result.segments:
             if not result.raw_text:
                 return ""
-            paragraphs = [
+            paragraphs: list[str] = [
                 normalize_sentence_text(p)
                 for p in result.raw_text.split("\n\n")
                 if p.strip()
             ]
             return "\n\n".join(paragraphs) + "\n" if paragraphs else ""
 
-        paragraphs: list[str] = []
+        paragraphs = []
         current_group: list[str] = []
-        current_speaker: Optional[str] = None
+        current_speaker: str | None = None
         prev_end: float = 0.0
 
         for seg in result.segments:
@@ -111,7 +110,7 @@ class ProseExporter(BaseExporter):
             return ""
         return "\n\n".join(paragraphs) + "\n"
 
-    def _format_paragraph(self, speaker: Optional[str], text_parts: list[str]) -> str:
+    def _format_paragraph(self, speaker: str | None, text_parts: list[str]) -> str:
         smoothed = _join_segment_texts(text_parts)
         if not smoothed:
             return ""

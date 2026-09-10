@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -14,7 +15,7 @@ class ShowMapping(BaseModel):
 
     feed_url: str = Field(..., description="Podcast RSS feed URL")
     show_title: str = Field(..., description="Title of the podcast show")
-    youtube_channel_url: Optional[str] = Field(
+    youtube_channel_url: str | None = Field(
         default=None,
         description="Associated YouTube channel URL or handle",
     )
@@ -45,7 +46,7 @@ class UserPreference(BaseModel):
 
     key: str = Field(..., description="Preference key identifier")
     value: Any = Field(..., description="Preference value (primitive, dict, or list)")
-    updated_at: Optional[str] = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+    updated_at: str | None = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO timestamp when preference was last updated",
     )

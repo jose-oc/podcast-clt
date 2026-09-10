@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from typing import Annotated
-from rich.panel import Panel
-from rich.table import Table
+
 import typer
+from rich.table import Table
 
 from podcast_ctl.discovery.resolver import resolve_input
 from podcast_ctl.gatekeeper.inspector import PreFlightInspector

@@ -10,10 +10,10 @@ from podcast_ctl.storage.db import (
 from podcast_ctl.storage.repository import StorageRepository
 
 __all__ = [
-    "Database",
-    "StorageRepository",
-    "get_default_db_path",
     "DEFAULT_DB_DIR",
     "DEFAULT_DB_FILE",
     "SCHEMA_SQL",
+    "Database",
+    "StorageRepository",
+    "get_default_db_path",
 ]

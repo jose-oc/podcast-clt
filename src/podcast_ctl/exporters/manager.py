@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
-from typing import Optional, Union
 import unicodedata
+from pathlib import Path
 
 from podcast_ctl.exporters.base import BaseExporter
 from podcast_ctl.exporters.json_exporter import JsonExporter
@@ -68,7 +67,7 @@ class ExportManager:
             f"Available formats: {', '.join(sorted(self._exporters.keys()))}"
         )
 
-    def resolve_formats(self, formats: Union[list[str], str]) -> list[str]:
+    def resolve_formats(self, formats: list[str] | str) -> list[str]:
         """Expand format aliases and list into unique normalized format names."""
         if isinstance(formats, str):
             raw_items = [f.strip() for f in formats.split(",") if f.strip()]
@@ -94,9 +93,9 @@ class ExportManager:
     def get_output_path(
         self,
         result: TranscriptResult,
-        output_dir: Union[str, Path],
+        output_dir: str | Path,
         format_name: str,
-        template: Optional[str] = None,
+        template: str | None = None,
     ) -> Path:
         """Generate output path based on metadata and output template."""
         exporter = self.get_exporter(format_name)
@@ -127,9 +126,9 @@ class ExportManager:
     def export_all(
         self,
         result: TranscriptResult,
-        output_dir: Union[str, Path],
-        formats: Union[list[str], str] = "both",
-        filename_template: Optional[str] = None,
+        output_dir: str | Path,
+        formats: list[str] | str = "both",
+        filename_template: str | None = None,
     ) -> dict[str, Path]:
         """Export result into one or more formats and save to disk."""
         target_formats = self.resolve_formats(formats)
