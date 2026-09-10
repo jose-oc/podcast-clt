@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import re
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
@@ -11,6 +11,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
+from podcast_ctl.cli import selection
 from podcast_ctl.discovery.resolver import resolve_input
 from podcast_ctl.engines.base import TranscriptionEngineError
 from podcast_ctl.engines.dispatcher import TranscriptionDispatcher
@@ -26,21 +27,11 @@ from podcast_ctl.models.transcript import EpisodeMetadata
 from podcast_ctl.storage.repository import StorageRepository
 from podcast_ctl.ui.console import console
 
-# Leading episode number in a title, e.g. "2894. Title", "#2894 - Title" or "2894: Title"
-_LEADING_TITLE_NUMBER_REGEX = re.compile(r"^\s*#?(?P<number>\d+)[\s.\-:)\]]")
-
-
-def _match_episode_number(all_episodes: list[EpisodeMetadata], number: int) -> list[EpisodeMetadata]:
-    """Match episodes by their own declared or title-prefixed episode number."""
-    declared = [ep for ep in all_episodes if ep.episode_number == number]
-    if declared:
-        return declared
-    matches = []
-    for ep in all_episodes:
-        title_match = _LEADING_TITLE_NUMBER_REGEX.match(ep.episode_title)
-        if title_match and int(title_match.group("number")) == number:
-            matches.append(ep)
-    return matches
+# Aliases kept so the pre-0.4 helper names (and their tests) keep working;
+# the implementations now live in podcast_ctl.cli.selection.
+_LEADING_TITLE_NUMBER_REGEX = selection.LEADING_TITLE_NUMBER_REGEX
+_match_episode_number = selection.match_episode_number
+_episode_number_label = selection.episode_number_label
 
 
 def _select_episodes(
@@ -86,14 +77,57 @@ def _select_episodes(
     return list(all_episodes[:count])
 
 
-def _episode_number_label(ep: EpisodeMetadata) -> str:
-    """Human-readable episode number, declared or parsed from the title."""
-    if ep.episode_number is not None:
-        return str(ep.episode_number)
-    title_match = _LEADING_TITLE_NUMBER_REGEX.match(ep.episode_title)
-    if title_match:
-        return title_match.group("number")
-    return "-"
+def _select_episodes_multi(
+    all_episodes: list[EpisodeMetadata],
+    *,
+    episode_filter: str | None,
+    all_flag: bool,
+    latest: int,
+    episodes_spec: str | None,
+    match_pattern: str | None,
+    since: date | None,
+    until: date | None,
+    pick: bool,
+) -> list[EpisodeMetadata]:
+    """Resolve the final episode selection from all CLI selection options.
+
+    ``--episode``/``--all``/``--latest`` keep their single-exact semantics; the
+    multi-select options (``--episodes``, ``--match``, ``--since``/``--until``)
+    compose as a logical AND, and ``--pick`` narrows the result interactively.
+    """
+    multi_selection = any([episodes_spec, match_pattern, since is not None, until is not None, pick])
+    if episode_filter is not None or not multi_selection:
+        return _select_episodes(
+            all_episodes,
+            episode_filter=episode_filter,
+            all_flag=all_flag,
+            latest=latest,
+        )
+
+    if episodes_spec:
+        spec = selection.parse_episode_number_spec(episodes_spec)
+        selected, missing = selection.select_by_number_spec(all_episodes, spec)
+        if missing:
+            console.warning(f"No episode found with number(s): {', '.join(str(n) for n in missing)}")
+    else:
+        selected = list(all_episodes)
+
+    if match_pattern:
+        selected = selection.filter_by_title_pattern(selected, match_pattern)
+
+    if since is not None or until is not None:
+        selected, unknown_dates = selection.filter_by_publication_date(selected, since, until)
+        if unknown_dates:
+            console.info(f"Excluded {unknown_dates} episode(s) without a parseable publication date.")
+
+    if pick and selected:
+        picked = selection.pick_episodes_interactively(selected)
+        if picked is None:
+            console.warning("Selection cancelled.")
+            raise typer.Exit(code=0)
+        return picked
+
+    return selected
 
 
 def _display_selected_episodes(selected_episodes: list[EpisodeMetadata]) -> None:
@@ -107,6 +141,7 @@ def _display_selected_episodes(selected_episodes: list[EpisodeMetadata]) -> None
         ]
         if ep.published_date:
             lines.append(f"[bold white]Published:[/bold white] {ep.published_date}")
+        lines.append(f"[bold white]Duration:[/bold white] {selection.format_duration(ep.duration_seconds)}")
         console.print(
             Panel(
                 "\n".join(lines),
@@ -121,13 +156,16 @@ def _display_selected_episodes(selected_episodes: list[EpisodeMetadata]) -> None
     table.add_column("Episode No.", justify="right")
     table.add_column("Title", overflow="fold")
     table.add_column("Published", style="dim")
+    table.add_column("Duration", style="dim")
     preview_limit = 20
     for position, ep in enumerate(selected_episodes[:preview_limit], start=1):
+        published = selection.episode_publication_date(ep)
         table.add_row(
             str(position),
             _episode_number_label(ep),
             ep.episode_title,
-            ep.published_date or "-",
+            published.isoformat() if published else (ep.published_date or "-"),
+            selection.format_duration(ep.duration_seconds),
         )
     console.print(table)
     if len(selected_episodes) > preview_limit:
@@ -152,6 +190,44 @@ def transcribe_command(
             ),
         ),
     ] = None,
+    episodes: Annotated[
+        str | None,
+        typer.Option(
+            "--episodes",
+            help=(
+                "Multiple episodes by number: comma-separated list and/or inclusive ranges, "
+                "e.g. '2890,2894,2901' or '2890..2900'"
+            ),
+        ),
+    ] = None,
+    match: Annotated[
+        str | None,
+        typer.Option(
+            "--match",
+            help="Select episodes whose title matches a case-insensitive regular expression",
+        ),
+    ] = None,
+    since: Annotated[
+        str | None,
+        typer.Option(
+            "--since",
+            help="Select episodes published on or after this date (YYYY-MM-DD)",
+        ),
+    ] = None,
+    until: Annotated[
+        str | None,
+        typer.Option(
+            "--until",
+            help="Select episodes published on or before this date (YYYY-MM-DD)",
+        ),
+    ] = None,
+    pick: Annotated[
+        bool,
+        typer.Option(
+            "--pick",
+            help="Interactively pick episodes from a multi-select list (combines with the other filters)",
+        ),
+    ] = False,
     all_episodes: Annotated[
         bool,
         typer.Option(
@@ -165,7 +241,7 @@ def transcribe_command(
         typer.Option(
             "--latest",
             "-l",
-            help="Transcribe the latest N episodes (default: 1)",
+            help="Transcribe the latest N episodes (default: 1; ignored when any selection option is given)",
         ),
     ] = 1,
     engine: Annotated[
@@ -243,16 +319,47 @@ def transcribe_command(
         raise typer.Exit(code=1)
 
     # 2. Select / filter episodes
-    selected_episodes = _select_episodes(
-        all_episodes=resolved.episodes,
-        episode_filter=episode,
-        all_flag=all_episodes,
-        latest=latest,
-    )
+    multi_flags = any([episodes, match, since, until, pick])
+    if episode and multi_flags:
+        console.error(
+            "--episode cannot be combined with --episodes, --match, --since, --until or --pick. "
+            "Use --episode for one exact episode, or the multi-select options without it."
+        )
+        raise typer.Exit(code=2)
+    if all_episodes and multi_flags:
+        console.error(
+            "--all cannot be combined with --episodes, --match, --since, --until or --pick; "
+            "filters already scan the whole feed."
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        since_date = selection.parse_cli_date(since) if since else None
+        until_date = selection.parse_cli_date(until) if until else None
+        if since_date and until_date and since_date > until_date:
+            raise selection.EpisodeSpecError(
+                f"--since ({since_date.isoformat()}) must be on or before --until ({until_date.isoformat()})."
+            )
+        selected_episodes = _select_episodes_multi(
+            resolved.episodes,
+            episode_filter=episode,
+            all_flag=all_episodes,
+            latest=latest,
+            episodes_spec=episodes,
+            match_pattern=match,
+            since=since_date,
+            until=until_date,
+            pick=pick,
+        )
+    except selection.EpisodeSpecError as exc:
+        console.error(str(exc))
+        raise typer.Exit(code=2) from exc
 
     if not selected_episodes:
         if episode:
             console.error(f"No episode found matching filter: '{episode}'")
+        elif multi_flags:
+            console.error("No episodes matched the given selection filters.")
         else:
             console.error("No episodes selected.")
         raise typer.Exit(code=1)
@@ -319,7 +426,9 @@ def transcribe_command(
                 f"Successfully transcribed '{ep.episode_title}' [bold cyan]({result.tier_used.upper()})[/bold cyan]"
             )
             for fmt_name, path in saved_paths.items():
-                console.print(f"  [bold green]✔[/bold green] [cyan]{fmt_name.upper()}:[/cyan] [dim underline]{path}[/dim underline]")
+                console.print(
+                    f"  [bold green]✔[/bold green] [cyan]{fmt_name.upper()}:[/cyan] [dim underline]{path}[/dim underline]"
+                )
 
             success_count += 1
 

@@ -93,8 +93,19 @@ podcast-ctl transcribe <input_source> [OPTIONS]
   * Exact Episode ID / GUID (e.g. `-e 12345-abcde`)
   * Case-insensitive title substring (e.g. `-e "Sam Altman"`)
 
-  The selected episode(s) - number, title, ID and publication date - are always shown before the confirmation prompt.
-* `--latest`, `-l` *(int, default: 1)*: Transcribe latest N episodes (applied if `--all` or `--episode` is not specified).
+  The selected episode(s) - number, title, ID and publication date - are always shown before the confirmation prompt. `--episode` targets one exact episode and cannot be combined with the multi-select options below.
+* `--episodes` *(string, default: None)*: Select multiple episodes by their own number (feed-declared number or leading number in the title - never the feed position). Accepts a comma-separated list and/or inclusive ranges:
+  * `--episodes 2890,2894,2901` - a scattered list, transcribed in the given order.
+  * `--episodes 2890..2900` - an inclusive range, transcribed in ascending numeric order.
+  * `--episodes 2894,2890..2892` - lists and ranges can be mixed; duplicates are removed.
+  * Numbers with no matching episode are reported as a warning; the command fails only if nothing matches.
+* `--match` *(string, default: None)*: Select episodes whose title matches a case-insensitive regular expression (e.g. `--match "Kubernetes|Talos"`). Results are in feed order, newest first.
+* `--since` *(string, default: None)*: Select episodes published on or after this date (`YYYY-MM-DD`).
+* `--until` *(string, default: None)*: Select episodes published on or before this date (`YYYY-MM-DD`).
+* `--pick` *(bool, default: False)*: Interactively pick episodes from a multi-select list showing number, title, date and duration. Requires an interactive terminal; long lists ask for a title filter first.
+
+  The multi-select options compose as a logical AND: `--episodes 2890..2900 --match "SEO"` selects the SEO-titled episodes within that number range, and `--pick` narrows whatever the other filters selected. They cannot be combined with `--episode` or `--all`. Episodes without a parseable publication date are excluded (and reported) when a date filter is used. Every selection is shown - number, date, title and duration - before the confirmation prompt.
+* `--latest`, `-l` *(int, default: 1)*: Transcribe latest N episodes (ignored when `--all`, `--episode` or any multi-select option is specified).
 * `--all`, `-a` *(bool, default: False)*: Transcribe all available episodes in the feed.
 * `--engine` *(string, default: "auto")*: Transcription engine strategy (`auto`, `rss`, `youtube`, `whisper`, `groq`, `openai`).
 * `--model-size` *(string, default: "base")*: Faster-Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`).
@@ -118,6 +129,22 @@ podcast-ctl transcribe "Latent Space" -e "Ilya Sutskever" --model-size small
 
 # Transcribe latest 3 episodes and export all formats without interactive prompts
 podcast-ctl transcribe "Hardcore History" --latest 3 --format all --yes
+
+# Transcribe a scattered list of episodes by number
+podcast-ctl transcribe "Marketing Online" --episodes 2890,2894,2901
+
+# Transcribe a consecutive range of episodes by number
+podcast-ctl transcribe "Marketing Online" --episodes 2890..2900
+
+# Transcribe every episode whose title matches a pattern
+podcast-ctl transcribe "Marketing Online" --match "Kubernetes|Talos"
+
+# Transcribe episodes published within a date range
+podcast-ctl transcribe "Marketing Online" --since 2026-01-01 --until 2026-03-31
+
+# Combine filters (AND) and/or pick episodes interactively
+podcast-ctl transcribe "Marketing Online" --episodes 2800..2900 --match "SEO"
+podcast-ctl transcribe "Marketing Online" --match "SEO" --pick
 
 # Transcribe a local audio recording directly
 podcast-ctl transcribe ./meeting.m4a -o ./notes -f markdown
