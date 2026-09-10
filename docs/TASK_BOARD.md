@@ -11,6 +11,9 @@ This board tracks the implementation status of all `podcast-ctl` work packages.
 | **Task 5** | Pre-Flight Gatekeeper & Interactive Learning | ✅ Completed | `docs/subagent_tasks/task_5_gatekeeper_learning.md` | `tests/test_gatekeeper.py` |
 | **Task 6** | Multi-Format Exporters | ✅ Completed | `docs/subagent_tasks/task_6_exporters.md` | `tests/test_exporters.py` |
 | **Task 7** | CLI Commands, Docs & Integration | ✅ Completed | `docs/subagent_tasks/task_7_cli_orchestration.md` | `tests/test_cli.py` |
+| **Phase 2a/2b** | Knowledge Base: derived Markdown, INDEX.md, FTS5 chunk search | ✅ Completed | `docs/KNOWLEDGE_BASE_DESIGN.md` → `docs/KNOWLEDGE_BASE.md` | `tests/test_kb.py` |
+| **Phase 2c** | KB vector embeddings (local default, optional cloud adapters) + hybrid fusion | ⬜ Pending | `docs/KNOWLEDGE_BASE_DESIGN.md` | — |
+| **Phase 2d** | KB golden-query evaluation harness | ⬜ Pending | `docs/KNOWLEDGE_BASE_DESIGN.md` | — |
 
 ---
 

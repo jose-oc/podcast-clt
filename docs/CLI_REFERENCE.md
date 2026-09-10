@@ -195,6 +195,36 @@ Clear cached transcripts from SQLite.
 podcast-ctl cache clean [--show <show_id>] [--yes]
 ```
 
+### 6. `kb`
+
+Build and query the knowledge base (KB) derived from cached transcripts:
+per-episode Markdown, an `INDEX.md` catalog, and a chunked FTS5 search index
+with `[Episode @ mm:ss]` citations. See the
+[Knowledge Base Guide](KNOWLEDGE_BASE.md) for the full end-to-end flow.
+
+#### `kb build`
+Build (or incrementally update) the KB from cached transcripts.
+```bash
+podcast-ctl kb build [--show <show_id>] [--kb-dir <path>]
+```
+Unchanged episodes are skipped; episodes removed from the cache are pruned.
+
+#### `kb search`
+Search the chunk index (BM25, diacritics-insensitive; AND first, OR fallback).
+```bash
+podcast-ctl kb search <query> [--limit <N>] [--show <show_id>] [--json] [--context] [--kb-dir <path>]
+```
+* `--json`: machine-readable chunks for scripting.
+* `--context`: full chunks as Markdown blocks, ready to paste into an LLM.
+
+#### `kb status`
+Show KB location, size, and index statistics.
+```bash
+podcast-ctl kb status [--kb-dir <path>]
+```
+
+---
+
 ---
 
 ## Environment Variables
@@ -202,6 +232,7 @@ podcast-ctl cache clean [--show <show_id>] [--yes]
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `PODCAST_CTL_DB_PATH` | Custom path to SQLite database file. | `~/.local/share/podcast-ctl/podcast_ctl.db` |
+| `PODCAST_CTL_KB_DIR` | Custom path to the knowledge base directory. | `kb/` next to the catalog DB |
 | `GROQ_API_KEY` | API key for Groq Cloud Whisper API. | None |
 | `OPENAI_API_KEY` | API key for OpenAI Whisper API. | None |
 
