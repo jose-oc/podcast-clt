@@ -202,6 +202,7 @@ def _parse_xml_element_tree(
         ep_audio_url: str | None = None
         ep_duration_raw: str | None = None
         ep_pub_date: str | None = None
+        ep_number: int | None = None
 
         # Extract Podcasting 2.0 transcripts
         ep_transcripts = _extract_podcast_transcripts(item_elem)
@@ -226,6 +227,12 @@ def _parse_xml_element_tree(
                 ep_duration_raw = itext
             elif iltag in ("pubdate", "published", "date") and itext:
                 ep_pub_date = itext
+            elif iltag == "episode" and itext and ep_number is None:
+                # itunes:episode declares the show's own episode number
+                try:
+                    ep_number = int(itext)
+                except ValueError:
+                    logger.debug("Ignoring non-numeric itunes:episode value %r", itext)
             elif iltag == "link" and not ep_guid:
                 ep_guid = itext or item_child.attrib.get("href")
 
@@ -241,6 +248,7 @@ def _parse_xml_element_tree(
                 audio_url=ep_audio_url,
                 duration_seconds=duration_sec,
                 published_date=ep_pub_date,
+                episode_number=ep_number,
                 rss_transcripts=ep_transcripts,
                 source_type="rss",
             )

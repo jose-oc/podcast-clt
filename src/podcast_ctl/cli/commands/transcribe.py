@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.panel import Panel
+from rich.table import Table
 
 from podcast_ctl.discovery.resolver import resolve_input
 from podcast_ctl.engines.base import TranscriptionEngineError
@@ -23,6 +26,22 @@ from podcast_ctl.models.transcript import EpisodeMetadata
 from podcast_ctl.storage.repository import StorageRepository
 from podcast_ctl.ui.console import console
 
+# Leading episode number in a title, e.g. "2894. Title", "#2894 - Title" or "2894: Title"
+_LEADING_TITLE_NUMBER_REGEX = re.compile(r"^\s*#?(?P<number>\d+)[\s.\-:)\]]")
+
+
+def _match_episode_number(all_episodes: list[EpisodeMetadata], number: int) -> list[EpisodeMetadata]:
+    """Match episodes by their own declared or title-prefixed episode number."""
+    declared = [ep for ep in all_episodes if ep.episode_number == number]
+    if declared:
+        return declared
+    matches = []
+    for ep in all_episodes:
+        title_match = _LEADING_TITLE_NUMBER_REGEX.match(ep.episode_title)
+        if title_match and int(title_match.group("number")) == number:
+            matches.append(ep)
+    return matches
+
 
 def _select_episodes(
     all_episodes: list[EpisodeMetadata],
@@ -36,18 +55,23 @@ def _select_episodes(
 
     if episode_filter is not None:
         query = episode_filter.strip()
-        # 1. 1-based numeric index
         if query.isdigit():
+            # 1. Numeric filters match the episode's own number first
+            #    (feed-declared itunes:episode, then a leading number in the title).
+            number_matches = _match_episode_number(all_episodes, int(query))
+            if number_matches:
+                return number_matches
+            # 2. Fall back to 1-based positional index in feed order (newest first).
             idx = int(query)
             if 1 <= idx <= len(all_episodes):
                 return [all_episodes[idx - 1]]
 
-        # 2. Exact episode_id match
+        # 3. Exact episode_id match
         exact_id_matches = [ep for ep in all_episodes if ep.episode_id == query]
         if exact_id_matches:
             return exact_id_matches
 
-        # 3. Case-insensitive title substring match
+        # 4. Case-insensitive title substring match
         title_matches = [ep for ep in all_episodes if query.lower() in ep.episode_title.lower()]
         if title_matches:
             return title_matches
@@ -62,6 +86,54 @@ def _select_episodes(
     return list(all_episodes[:count])
 
 
+def _episode_number_label(ep: EpisodeMetadata) -> str:
+    """Human-readable episode number, declared or parsed from the title."""
+    if ep.episode_number is not None:
+        return str(ep.episode_number)
+    title_match = _LEADING_TITLE_NUMBER_REGEX.match(ep.episode_title)
+    if title_match:
+        return title_match.group("number")
+    return "-"
+
+
+def _display_selected_episodes(selected_episodes: list[EpisodeMetadata]) -> None:
+    """Show exactly which episode(s) will be transcribed before any confirmation prompt."""
+    if len(selected_episodes) == 1:
+        ep = selected_episodes[0]
+        lines = [
+            f"[bold white]Episode number:[/bold white] {_episode_number_label(ep)}",
+            f"[bold white]Title:[/bold white] {ep.episode_title}",
+            f"[bold white]Episode ID:[/bold white] [dim]{ep.episode_id}[/dim]",
+        ]
+        if ep.published_date:
+            lines.append(f"[bold white]Published:[/bold white] {ep.published_date}")
+        console.print(
+            Panel(
+                "\n".join(lines),
+                title="[bold cyan]Selected episode[/bold cyan]",
+                border_style="cyan",
+            )
+        )
+        return
+
+    table = Table(title="Selected episodes", title_style="bold cyan", header_style="bold cyan")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Episode No.", justify="right")
+    table.add_column("Title", overflow="fold")
+    table.add_column("Published", style="dim")
+    preview_limit = 20
+    for position, ep in enumerate(selected_episodes[:preview_limit], start=1):
+        table.add_row(
+            str(position),
+            _episode_number_label(ep),
+            ep.episode_title,
+            ep.published_date or "-",
+        )
+    console.print(table)
+    if len(selected_episodes) > preview_limit:
+        console.info(f"... and {len(selected_episodes) - preview_limit} more episode(s).")
+
+
 def transcribe_command(
     input_source: Annotated[
         str,
@@ -74,7 +146,10 @@ def transcribe_command(
         typer.Option(
             "--episode",
             "-e",
-            help="Specific episode to transcribe by 1-based index, episode ID/GUID, or title substring",
+            help=(
+                "Specific episode to transcribe by episode number (e.g. 2894), "
+                "1-based index in feed order, episode ID/GUID, or title substring"
+            ),
         ),
     ] = None,
     all_episodes: Annotated[
@@ -182,18 +257,21 @@ def transcribe_command(
             console.error("No episodes selected.")
         raise typer.Exit(code=1)
 
-    # 3. Pre-Flight Gatekeeper Analysis
+    # 3. Show exactly which episode(s) will be transcribed
+    _display_selected_episodes(selected_episodes)
+
+    # 4. Pre-Flight Gatekeeper Analysis
     repo = StorageRepository()
     inspector = PreFlightInspector(repository=repo)
     summary = inspector.inspect_episodes_sync(selected_episodes, preferred_engine=engine)
 
-    # 4. Batch Confirmation Prompt
+    # 5. Batch Confirmation Prompt
     confirmed = prompt_batch_confirmation(summary, auto_confirm=yes, console=console)
     if not confirmed:
         console.warning("Transcription aborted by user.")
         raise typer.Exit(code=0)
 
-    # 5. Transcription & Export Loop
+    # 6. Transcription & Export Loop
     dispatcher = TranscriptionDispatcher(storage_repo=repo)
     export_mgr = ExportManager()
 
