@@ -80,7 +80,7 @@ def seed_transcripts(repo: StorageRepository) -> None:
 def ask_ollama(model: str, question: str, context: str) -> str:
     """Send the question plus retrieved chunks to a local Ollama model."""
     prompt = (
-        "Answer the question using ONLY the context below. "
+        "Answer the question in Spanish using ONLY the context below. "
         "Cite sources as [Episode @ mm:ss]. If the context does not answer it, say so.\n\n"
         f"Context:\n{context}\n\nQuestion: {question}"
     )
