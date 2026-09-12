@@ -64,7 +64,7 @@ podcast-ctl inspect <input_source> [OPTIONS]
 #### Examples
 ```bash
 # Inspect an RSS feed
-podcast-ctl inspect "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl inspect "https://cuonda.com/monos-estocasticos/feed"
 
 # Inspect by show title (auto-resolves via iTunes search)
 podcast-ctl inspect "All-In Podcast"
@@ -122,7 +122,7 @@ podcast-ctl transcribe <input_source> [OPTIONS]
 #### Examples
 ```bash
 # Transcribe the latest episode of a show into Markdown and Text
-podcast-ctl transcribe "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl transcribe "https://cuonda.com/monos-estocasticos/feed"
 
 # Transcribe specific episode by title search using small Whisper model
 podcast-ctl transcribe "Latent Space" -e "Ilya Sutskever" --model-size small

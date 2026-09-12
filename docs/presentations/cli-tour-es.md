@@ -89,7 +89,7 @@ o pasar a cualquier LLM.
   <div class="arrow">→</div>
   <div class="step"><b>Transcribe</b>4 niveles en cascada, el más barato primero</div>
   <div class="arrow">→</div>
-  <div class="step"><b>Base de conocimiento</b>Markdown + búsqueda de texto completo</div>
+  <div class="step"><b>Base de conocimiento</b>Markdown + búsqueda híbrida</div>
   <div class="arrow">→</div>
   <div class="step"><b>Pregunta</b>Cualquier LLM — local o en la nube</div>
 </div>
@@ -280,6 +280,50 @@ podcast-ctl kb search "precios" --json
 
 ---
 
+## Búscala por significado — embeddings + híbrida
+
+```bash
+podcast-ctl kb embed                               # un vector por fragmento, incremental
+podcast-ctl kb search "dolor de hombro"            # también encuentra "molestias en el trapecio"
+podcast-ctl kb search "dolor de hombro" --mode lexical  # solo palabras literales
+```
+
+- La búsqueda léxica (FTS5/BM25) encuentra **palabras literales**; los vectores encuentran **significado**
+- **Híbrida** fusiona ambos rankings con Reciprocal Rank Fusion (RRF) — mejor que cada una por separado
+- `--mode auto` (por defecto): híbrida si ya hay embeddings, léxica si no
+
+<!--
+Guion: la búsqueda léxica se pierde las paráfrasis — "dolor de hombro" no
+casa con un episodio que dice "molestias en el trapecio". kb embed convierte
+cada fragmento en un vector de su significado, y las paráfrasis casan. La
+híbrida ejecuta ambas búsquedas y fusiona los rankings con RRF; la columna
+Sources muestra cuál rankeó cada resultado. Prueba la misma consulta con
+--mode lexical y sin él — la diferencia vende la función.
+-->
+
+---
+
+## Vectores en local, cero acoplamiento
+
+- Modelo por defecto: **BAAI/bge-m3** con sentence-transformers — multilingüe potente (español incluido)
+- **Privado y gratis**: sin coste por consulta, los transcripts no salen de tu máquina
+- Coste único: torch + descarga de **~2 GB** del modelo; ~4 KB por fragmento en disco
+- Los vectores son blobs en el mismo `kb.sqlite` — coseno **exacto** en proceso, sin servicio de BD vectorial
+- Adaptador de nube opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
+- Cambia de modelo o proveedor → `podcast-ctl kb embed --reindex`
+
+<!--
+Guion: ¿de dónde salen los vectores? De un modelo local, bge-m3, bueno en
+español, sin API key ni coste por consulta. Los ~2 GB y torch son un coste
+único, y ambos solo *generan* vectores; compararlos después es aritmética.
+¿Por qué no una BD vectorial? A esta escala el coseno exacto en proceso tarda
+milisegundos y encuentra los vecinos reales; los índices aproximados (HNSW)
+compensan a partir de millones de vectores. Si llegamos, sqlite-vec reutiliza
+los mismos vectores guardados. Explicación completa: docs/HYBRID_SEARCH.md.
+-->
+
+---
+
 ## 5 · Pregunta a un LLM — *tu* LLM
 
 La KB no te ata a ningún proveedor:
@@ -351,7 +395,7 @@ uv run podcast-ctl --help
 
 **github.com/jose-oc/podcast-clt** · Licencia MIT
 
-Documentación: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
+Documentación: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md` · `docs/HYBRID_SEARCH.md`
 
 <!--
 Guion: clónalo, transcribe un episodio, construye la KB y hazle una
