@@ -1,6 +1,6 @@
 [project]
 name = "podcast-ctl"
-version = "0.4.0"
+version = "0.5.0"
 description = "Fast, modular CLI to discover, inspect, and transcribe podcast episodes and YouTube shows."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +27,12 @@ dependencies = [
 #   pip install 'podcast-ctl[whisper]'
 whisper = [
     "faster-whisper>=1.0.0",
+]
+# Phase 2c (local embeddings) pulls in torch via sentence-transformers, which
+# is large. Install only if you want vector/hybrid KB search:
+#   pip install 'podcast-ctl[embeddings]'
+embeddings = [
+    "sentence-transformers>=2.7.0",
 ]
 dev = [
     "pytest>=8.0.0",

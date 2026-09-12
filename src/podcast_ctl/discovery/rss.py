@@ -15,7 +15,7 @@ from podcast_ctl.models.transcript import EpisodeMetadata
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = "podcast-ctl/0.4.0"
+DEFAULT_USER_AGENT = "podcast-ctl/0.5.0"
 
 # ISO 8601 Duration regex: e.g. PT1H30M15S, PT45M, PT30S
 ISO_DURATION_REGEX = re.compile(
