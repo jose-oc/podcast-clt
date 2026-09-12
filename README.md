@@ -73,13 +73,13 @@ podcast-ctl search "Latent Space"
 ### 2. Inspect a Feed (Pre-Flight Analysis)
 Preview episodes, duration, cache storage requirements, and tier resolutions without transcribing:
 ```bash
-podcast-ctl inspect "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl inspect "Latent Space"
 ```
 
 ### 3. Transcribe Episodes
 Transcribe the latest episode to Markdown (`.md`) and plain text (`.txt`):
 ```bash
-podcast-ctl transcribe "https://feeds.simplecast.com/82GLSDrl"
+podcast-ctl transcribe "Latent Space"
 ```
 
 Transcribe a specific episode using local Whisper `small` model:
@@ -100,6 +100,27 @@ Transcribe a local recording to all formats:
 ```bash
 podcast-ctl transcribe ./meeting.m4a -o ./transcripts --format all
 ```
+
+### 4. Build the Knowledge Base
+Turn every cached transcript into browsable Markdown and a searchable index:
+```bash
+podcast-ctl kb build
+```
+
+### 5. (Optional) Add Semantic Search
+Install the local embedding backend once, then vectorize the index — everything runs on your machine, no API keys:
+```bash
+uv sync --extra embeddings
+podcast-ctl kb embed
+```
+
+### 6. Search — Literal Words or Meaning
+```bash
+podcast-ctl kb search "vector databases"          # literal words (FTS5 + BM25)
+podcast-ctl kb search "shoulder pain"             # once embedded, also finds "trapezius discomfort"
+podcast-ctl kb search "shoulder pain" --context   # Markdown blocks, ready to paste into any LLM
+```
+Every hit cites `[Episode @ mm:ss]` so you can jump back to the audio. See the [Knowledge Base Guide](docs/KNOWLEDGE_BASE.md) for the end-to-end tutorial and [Hybrid Search, Explained](docs/HYBRID_SEARCH.md) for how lexical, vector, and hybrid search differ.
 
 ---
 
@@ -125,6 +146,7 @@ For deep dives into the system design, fallback logic, and database schemas, che
 - [CLI Reference Guide](docs/CLI_REFERENCE.md)
 - [Phase 2 AI Post-Processing Design](docs/POST_PROCESSING_DESIGN.md)
 - [Knowledge Base Guide](docs/KNOWLEDGE_BASE.md) — end-to-end example: podcast → transcript → KB → LLM answer
+- [Hybrid Search, Explained](docs/HYBRID_SEARCH.md) — lexical vs vector vs hybrid, in plain words
 - [Agent Guide](AGENTS.md) — using the CLI and KB from AI agents with shell access (`AGENTS.md` + `skills/podcast-clt/SKILL.md`)
 - [Phase 2 Knowledge Base Design](docs/KNOWLEDGE_BASE_DESIGN.md)
 

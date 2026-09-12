@@ -53,7 +53,8 @@ uv run podcast-ctl --help   # uv resolves and installs everything on first run
 | `mapping` | Manage show ↔ YouTube channel links | Linking a show unlocks free Tier-2 captions |
 | `cache` | Inspect or clean the transcript cache | `cache list` shows what is already transcribed |
 | `kb build` | Build or incrementally update the KB from cached transcripts | Reads the cache, not exported files |
-| `kb search <query>` | Search the chunk index with citations | `--json` is the machine interface; `--context` is for pasting |
+| `kb embed` | Embed indexed chunks for vector/hybrid search | Local model by default (no API key); incremental; `--reindex` after changing model/provider |
+| `kb search <query>` | Search the chunk index with citations | `--json` is the machine interface; `--context` is for pasting; `--mode auto\|lexical\|vector\|hybrid` (auto = hybrid once embeddings exist) |
 | `kb status` | Show KB location, size, and index stats | |
 
 Full flag-by-flag reference: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md).

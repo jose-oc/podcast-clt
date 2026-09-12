@@ -88,7 +88,7 @@ them into a knowledge base you can query or feed to any LLM.
   <div class="arrow">→</div>
   <div class="step"><b>Transcribe</b>4-tier fallback, cheapest first</div>
   <div class="arrow">→</div>
-  <div class="step"><b>Knowledge base</b>Markdown + full-text search</div>
+  <div class="step"><b>Knowledge base</b>Markdown + hybrid search</div>
   <div class="arrow">→</div>
   <div class="step"><b>Ask</b>Any LLM — local or cloud</div>
 </div>
@@ -279,6 +279,50 @@ podcast-ctl kb search "pricing" --json
 
 ---
 
+## Search by meaning — embeddings + hybrid
+
+```bash
+podcast-ctl kb embed                               # one vector per chunk, incremental
+podcast-ctl kb search "shoulder pain"              # also finds "trapezius discomfort"
+podcast-ctl kb search "shoulder pain" --mode lexical   # literal words only
+```
+
+- Lexical (FTS5/BM25) matches **literal words**; vectors match **meaning**
+- **Hybrid** fuses both rankings with Reciprocal Rank Fusion (RRF) — better than either alone
+- `--mode auto` (default): hybrid once embeddings exist, lexical before
+
+<!--
+Talk track: lexical search misses paraphrases — "shoulder pain" won't match an
+episode that says "trapezius discomfort". kb embed turns every chunk into a
+vector of its meaning, so paraphrases match. Hybrid runs both retrievers and
+merges the rankings with RRF; the Sources column shows which one ranked each
+hit. Try the same query with --mode lexical and without it — the difference
+sells the feature.
+-->
+
+---
+
+## Local vectors, zero lock-in
+
+- Default model: **BAAI/bge-m3** via sentence-transformers — strong multilingual retrieval (Spanish included)
+- **Private & free**: no per-query cost, transcripts never leave the machine
+- One-time cost: torch + **~2 GB** model download; ~4 KB per chunk on disk
+- Vectors are blobs in the same `kb.sqlite` — **exact** cosine in-process, no vector-DB service
+- Optional cloud adapter via env vars: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
+- Switch model or provider → `podcast-ctl kb embed --reindex`
+
+<!--
+Talk track: where do the vectors come from? A local model, bge-m3, good at
+Spanish, no API key, no per-query cost. The ~2 GB download and torch are
+one-time, and both only *produce* vectors; comparing them afterwards is just
+arithmetic. Why no vector database? At this scale an in-process exact cosine
+is milliseconds and finds the true nearest chunks; ANN indexes like HNSW pay
+off at millions of vectors. If we ever get there, sqlite-vec reuses the same
+stored vectors. Full explainer: docs/HYBRID_SEARCH.md.
+-->
+
+---
+
 ## 5 · Ask an LLM — *your* LLM
 
 The KB never locks you to a provider:
@@ -349,7 +393,7 @@ uv run podcast-ctl --help
 
 **github.com/jose-oc/podcast-clt** · MIT License
 
-Docs: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
+Docs: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md` · `docs/HYBRID_SEARCH.md`
 
 <!--
 Talk track: clone it, transcribe one episode, build a KB, and ask it a
