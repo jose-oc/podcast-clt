@@ -162,6 +162,16 @@ Current limits to plan around (same source):
 So the NotebookLM-compatible flow is: `kb build` → upload the per-episode
 Markdown (optionally merged) as sources → ask questions inside NotebookLM.
 
+#### Option D — an AI agent with shell access
+
+Desktop AI agents (Codex, Claude Code, Hermes, ...) don't need you to copy
+chunks around: point them at the repository and they can run the CLI
+themselves — `kb build` to index, `kb search --json` to retrieve only the
+relevant chunks with their citations, however large the KB grows. The repo
+ships an agent guide for exactly this: [AGENTS.md](../AGENTS.md), also exposed
+as a skill at `skills/podcast-clt/SKILL.md`. Retrieval stays deterministic
+and provider-agnostic; which model the agent uses remains your choice.
+
 ## Reproducible offline demo
 
 No network, API keys, or models needed — the script seeds two synthetic

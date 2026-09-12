@@ -19,7 +19,7 @@ Fast, modular CLI to discover, inspect, and transcribe podcast episodes, YouTube
 - 🛡️ **Gatekeeper & Workload Estimator**: Inspect feeds before running, preview total duration, estimated disk usage, and auto-resolved tiers.
 - 🧠 **Persistent Knowledge Learning**: Learns and remembers confirmed Show $\leftrightarrow$ YouTube Channel mappings and episode associations in a local SQLite database (WAL mode).
 - 📦 **Multi-Format Exporters**: Output to styled **Markdown** with YAML frontmatter, clean readable **Prose**, **SubRip (.srt)**, **WebVTT (.vtt)**, and structured **JSON**.
-- 🧾 **Knowledge Base (Phase 2)**: Derives per-episode Markdown + `INDEX.md` from cached transcripts, and a chunked FTS5 search index (`kb.sqlite`) with stable IDs and `[Episode @ mm:ss]` citations — provider-agnostic and LLM-ready (local Ollama, any cloud chat, or NotebookLM).
+- 🧾 **Knowledge Base (Phase 2)**: Derives per-episode Markdown + `INDEX.md` from cached transcripts, and a chunked FTS5 search index (`kb.sqlite`) with stable IDs and `[Episode @ mm:ss]` citations — provider-agnostic and LLM-ready (local Ollama, any cloud chat, NotebookLM, or a desktop AI agent driving the CLI itself — see [AGENTS.md](AGENTS.md)).
 - 🎨 **Rich Terminal UI**: Vibrant tables, progress spinners, interactive selection menus, and clear visual hierarchy.
 
 ---
@@ -125,6 +125,7 @@ For deep dives into the system design, fallback logic, and database schemas, che
 - [CLI Reference Guide](docs/CLI_REFERENCE.md)
 - [Phase 2 AI Post-Processing Design](docs/POST_PROCESSING_DESIGN.md)
 - [Knowledge Base Guide](docs/KNOWLEDGE_BASE.md) — end-to-end example: podcast → transcript → KB → LLM answer
+- [Agent Guide](AGENTS.md) — using the CLI and KB from AI agents with shell access (`AGENTS.md` + `skills/podcast-clt/SKILL.md`)
 - [Phase 2 Knowledge Base Design](docs/KNOWLEDGE_BASE_DESIGN.md)
 
 ---

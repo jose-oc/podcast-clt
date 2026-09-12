@@ -306,6 +306,28 @@ Upload `episodes/*.md` as sources. Timestamps survive as plain text.
 
 ---
 
+## 5b · The fourth path: an agent with a shell
+
+Desktop AI agents (Codex, Claude Code, Hermes…) don't need copy-paste — they run the CLI themselves:
+
+- The repo ships **`AGENTS.md`** and **`skills/podcast-clt/SKILL.md`**: plain Markdown that teaches any agent the commands
+- The agent runs `kb search --json` and gets **only the relevant chunks**, with citations — no matter how big the KB grows
+- Deterministic retrieval, **any provider**: the model stays your choice
+
+```bash
+podcast-ctl kb search "vector databases" --json --limit 5
+```
+
+<!--
+Talk track: copy-paste and NotebookLM don't scale, and Ollama needs a script.
+An agent with shell access runs the retrieval loop itself: search, read the
+chunks, search again if the answer isn't there. AGENTS.md is the convention
+most coding agents read when they enter a repo; the SKILL.md is the same
+guide in skill format. Zero coupling — it's plain Markdown.
+-->
+
+---
+
 ## Design principles
 
 <span class="tag">Cost first</span> <span class="tag">Privacy first</span> <span class="tag">Provider-agnostic</span>
@@ -327,7 +349,7 @@ uv run podcast-ctl --help
 
 **github.com/jose-oc/podcast-clt** · MIT License
 
-Docs: `README.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
+Docs: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
 
 <!--
 Talk track: clone it, transcribe one episode, build a KB, and ask it a
