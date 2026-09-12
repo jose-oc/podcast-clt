@@ -85,7 +85,7 @@ o pasar a cualquier LLM.
 <div class="flow">
   <div class="step"><b>🔍 Descubre</b>Busca en el catálogo de Apple Podcasts</div>
   <div class="arrow">→</div>
-  <div class="step"><b>Inspecciona</b>Pre-vuelo: trabajo y coste previstos</div>
+  <div class="step"><b>Inspecciona</b>Chequeo previo: trabajo y coste previstos</div>
   <div class="arrow">→</div>
   <div class="step"><b>Transcribe</b>4 niveles en cascada, el más barato primero</div>
   <div class="arrow">→</div>
@@ -117,7 +117,7 @@ uv run podcast-ctl --help
 | Comando | Qué hace |
 | :--- | :--- |
 | `search` | Encontrar programas en el catálogo de Apple Podcasts |
-| `inspect` | Análisis de pre-vuelo — antes de gastar nada |
+| `inspect` | Chequeo previo — antes de gastar nada |
 | `transcribe` | Transcribir episodios, vídeos o archivos locales |
 | `mapping` | Enseñar las relaciones programa ↔ canal de YouTube |
 | `cache` | Gestionar la caché local de transcripciones |
