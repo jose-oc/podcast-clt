@@ -307,6 +307,29 @@ Sube los `episodes/*.md` como fuentes. Las marcas de tiempo sobreviven como text
 
 ---
 
+## 5b · La cuarta vía: un agente con shell
+
+Los agentes de IA de escritorio (Codex, Claude Code, Hermes…) no necesitan que copies y pegues — manejan la CLI ellos mismos:
+
+- El repo incluye **`AGENTS.md`** y **`skills/podcast-clt/SKILL.md`**: Markdown plano que le enseña los comandos a cualquier agente
+- El agente ejecuta `kb search --json` y recibe **solo los fragmentos relevantes**, con citas — crezca lo que crezca la KB
+- Retrieval determinista, **cualquier proveedor**: el modelo lo eliges tú
+
+```bash
+podcast-ctl kb search "vector databases" --json --limit 5
+```
+
+<!--
+Guion: copiar y pegar y NotebookLM no escalan, y Ollama requiere un script.
+Un agente con shell ejecuta el bucle de retrieval él solo: busca, lee los
+fragmentos y vuelve a buscar si la respuesta no está. AGENTS.md es la
+convención que leen la mayoría de coding agents al entrar en un repo; el
+SKILL.md es la misma guía en formato skill. Cero acoplamiento — es Markdown
+plano.
+-->
+
+---
+
 ## Principios de diseño
 
 <span class="tag">Coste primero</span> <span class="tag">Privacidad primero</span> <span class="tag">Sin atarse a proveedores</span>
@@ -328,7 +351,7 @@ uv run podcast-ctl --help
 
 **github.com/jose-oc/podcast-clt** · Licencia MIT
 
-Documentación: `README.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
+Documentación: `README.md` · `AGENTS.md` · `docs/CLI_REFERENCE.md` · `docs/KNOWLEDGE_BASE.md`
 
 <!--
 Guion: clónalo, transcribe un episodio, construye la KB y hazle una

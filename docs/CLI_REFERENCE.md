@@ -232,6 +232,10 @@ per-episode Markdown, an `INDEX.md` catalog, and a chunked FTS5 search index
 with `[Episode @ mm:ss]` citations. See the
 [Knowledge Base Guide](KNOWLEDGE_BASE.md) for the full end-to-end flow.
 
+AI agents with shell access can drive these commands directly — `kb search
+--json` is the machine-readable interface. The full agent guide lives in
+[AGENTS.md](../AGENTS.md) (also shipped as `skills/podcast-clt/SKILL.md`).
+
 #### `kb build`
 Build (or incrementally update) the KB from cached transcripts.
 ```bash
