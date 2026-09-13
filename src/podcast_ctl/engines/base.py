@@ -20,6 +20,15 @@ class TranscriptNotFoundError(TranscriptionEngineError):
     """Raised when transcripts or subtitles are not found or cannot be parsed."""
 
 
+class EngineRateLimitedError(TranscriptionEngineError):
+    """Raised when an engine's upstream is rate-limiting or IP-blocking requests (e.g. YouTube HTTP 429).
+
+    The dispatcher treats this as a batch-level signal: the engine is disabled
+    for the rest of the batch instead of being retried episode by episode,
+    which is what prolongs the block.
+    """
+
+
 class BaseTranscriptionEngine(ABC):
     """Abstract base class for all transcription engine implementations."""
 

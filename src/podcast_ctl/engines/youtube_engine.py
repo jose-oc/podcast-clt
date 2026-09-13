@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import re
 from typing import Any
 
@@ -15,6 +16,7 @@ import httpx
 
 from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
+    EngineRateLimitedError,
     EngineUnavailableError,
     TranscriptNotFoundError,
 )
@@ -46,14 +48,40 @@ def extract_youtube_video_id(url_or_id: str | None) -> str | None:
     return None
 
 
+def is_youtube_rate_limit(exc: Exception) -> bool:
+    """Detect YouTube throttling signals across the subtitle backends.
+
+    youtube-transcript-api raises RequestBlocked/IpBlocked; yt-dlp raises
+    DownloadError carrying the HTTP status; direct timedtext fetches surface
+    as httpx.HTTPStatusError with status 429.
+    """
+    try:
+        from youtube_transcript_api import RequestBlocked
+
+        if isinstance(exc, RequestBlocked):
+            return True
+    except ImportError:
+        pass
+    try:
+        from yt_dlp.utils import DownloadError
+
+        if isinstance(exc, DownloadError) and ("429" in str(exc) or "Too Many Requests" in str(exc)):
+            return True
+    except ImportError:
+        pass
+    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429
+
+
 class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
     """Tier 2: Subtitle extractor for YouTube videos."""
 
     name: str = "youtube"
     tier: str = "youtube"
 
-    def __init__(self, preferred_languages: list[str] | None = None) -> None:
+    def __init__(self, preferred_languages: list[str] | None = None, request_delay: float = 0.0) -> None:
         self.preferred_languages = preferred_languages or ["en", "en-US", "en-GB"]
+        # Base seconds to wait before each video's subtitle fetch (jittered).
+        self.request_delay = request_delay
 
     def is_available(self) -> bool:
         """Checks if either youtube_transcript_api or yt_dlp is installed."""
@@ -280,6 +308,14 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
         languages = kwargs.get("languages") or self.preferred_languages
         errors: list[str] = []
 
+        # Polite pacing with jitter: hammering timedtext episode after episode
+        # is exactly what gets an IP throttled (HTTP 429).
+        delay = kwargs.get("youtube_delay", self.request_delay)
+        if delay and delay > 0:
+            sleep_s = delay * random.uniform(0.5, 1.5)
+            logger.info(f"Pacing YouTube subtitle request for {video_id} (waiting {sleep_s:.1f}s)")
+            await asyncio.sleep(sleep_s)
+
         # 1. Try youtube_transcript_api
         try:
             segments = await asyncio.to_thread(
@@ -292,6 +328,10 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
                     tier_used="youtube",
                 )
         except Exception as exc:
+            if is_youtube_rate_limit(exc):
+                raise EngineRateLimitedError(
+                    f"YouTube is rate-limiting requests from this IP (youtube-transcript-api: {type(exc).__name__})."
+                ) from exc
             logger.debug(f"youtube_transcript_api failed for {video_id}: {exc}")
             errors.append(f"youtube-transcript-api: {exc}")
 
@@ -305,6 +345,10 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
                     tier_used="youtube",
                 )
         except Exception as exc:
+            if is_youtube_rate_limit(exc):
+                raise EngineRateLimitedError(
+                    "YouTube is rate-limiting requests from this IP (yt-dlp: HTTP 429)."
+                ) from exc
             logger.debug(f"yt-dlp caption extraction failed for {video_id}: {exc}")
             errors.append(f"yt-dlp: {exc}")
 

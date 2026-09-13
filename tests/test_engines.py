@@ -7,12 +7,14 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
 
+import httpx
 import pytest
 import respx
 
 from podcast_ctl.engines import (
     BaseTranscriptionEngine,
     CloudTranscriptionEngine,
+    EngineRateLimitedError,
     EngineUnavailableError,
     RSSTranscriptionEngine,
     TranscriptionDispatcher,
@@ -22,6 +24,7 @@ from podcast_ctl.engines import (
     YouTubeTranscriptionEngine,
     detect_optimal_device_and_compute_type,
     extract_youtube_video_id,
+    is_youtube_rate_limit,
     parse_json_transcript,
     parse_plain_text,
     parse_srt_content,
@@ -1105,3 +1108,166 @@ class TestDispatcherChannelFallback:
 
         list_mock.assert_called_once()
 
+
+
+# =============================================================================
+# 9. YouTube pacing & rate-limit circuit breaker tests
+# =============================================================================
+
+
+class TestYouTubePacing:
+    @pytest.mark.asyncio
+    async def test_delay_with_jitter_before_fetch(self, sample_episode: EpisodeMetadata) -> None:
+        engine = YouTubeTranscriptionEngine()
+        episode = sample_episode.model_copy(update={"audio_url": "https://www.youtube.com/watch?v=N5AQFYtqx8Q"})
+        with (
+            patch(
+                "podcast_ctl.engines.youtube_engine.asyncio.sleep", new_callable=AsyncMock
+            ) as sleep_mock,
+            patch.object(
+                engine,
+                "_fetch_via_youtube_transcript_api",
+                return_value=[TranscriptSegment(start=0.0, end=1.0, text="hi")],
+            ),
+        ):
+            result = await engine.transcribe(episode, youtube_delay=2.0)
+        assert result.tier_used == "youtube"
+        sleep_mock.assert_awaited_once()
+        waited = sleep_mock.await_args.args[0]
+        assert 1.0 <= waited <= 3.0  # 2.0s base, jittered ±50%
+
+    @pytest.mark.asyncio
+    async def test_zero_delay_disables_pacing(self, sample_episode: EpisodeMetadata) -> None:
+        engine = YouTubeTranscriptionEngine()
+        episode = sample_episode.model_copy(update={"audio_url": "https://www.youtube.com/watch?v=N5AQFYtqx8Q"})
+        with (
+            patch("podcast_ctl.engines.youtube_engine.asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
+            patch.object(
+                engine,
+                "_fetch_via_youtube_transcript_api",
+                return_value=[TranscriptSegment(start=0.0, end=1.0, text="hi")],
+            ),
+        ):
+            await engine.transcribe(episode, youtube_delay=0.0)
+        sleep_mock.assert_not_awaited()
+
+    def test_rate_limit_detection(self) -> None:
+        import yt_dlp.utils
+        from youtube_transcript_api import IpBlocked, RequestBlocked
+
+        assert is_youtube_rate_limit(RequestBlocked("abc123def45"))
+        assert is_youtube_rate_limit(IpBlocked("abc123def45"))
+        assert is_youtube_rate_limit(yt_dlp.utils.DownloadError("HTTP Error 429: Too Many Requests"))
+        req = httpx.Request("GET", "https://www.youtube.com/api/timedtext")
+        assert is_youtube_rate_limit(
+            httpx.HTTPStatusError("429", request=req, response=httpx.Response(429, request=req))
+        )
+        assert not is_youtube_rate_limit(TranscriptNotFoundError("nope"))
+        assert not is_youtube_rate_limit(
+            httpx.HTTPStatusError("404", request=req, response=httpx.Response(404, request=req))
+        )
+
+    @pytest.mark.asyncio
+    async def test_request_blocked_raises_rate_limited_without_fallback(
+        self, sample_episode: EpisodeMetadata
+    ) -> None:
+        from youtube_transcript_api import IpBlocked
+
+        engine = YouTubeTranscriptionEngine()
+        episode = sample_episode.model_copy(update={"audio_url": "https://www.youtube.com/watch?v=N5AQFYtqx8Q"})
+        with (
+            patch.object(engine, "_fetch_via_youtube_transcript_api", side_effect=IpBlocked("N5AQFYtqx8Q")),
+            patch.object(engine, "_fetch_via_ytdlp", new_callable=AsyncMock) as ytdlp_mock,
+            pytest.raises(EngineRateLimitedError, match="rate-limiting"),
+        ):
+            await engine.transcribe(episode, youtube_delay=0.0)
+        ytdlp_mock.assert_not_awaited()  # no point hammering the second backend
+
+    @pytest.mark.asyncio
+    async def test_ytdlp_429_raises_rate_limited(self, sample_episode: EpisodeMetadata) -> None:
+        import yt_dlp.utils
+
+        engine = YouTubeTranscriptionEngine()
+        episode = sample_episode.model_copy(update={"audio_url": "https://www.youtube.com/watch?v=N5AQFYtqx8Q"})
+        with (
+            patch.object(
+                engine, "_fetch_via_youtube_transcript_api", side_effect=TranscriptNotFoundError("no subs")
+            ),
+            patch.object(
+                engine,
+                "_fetch_via_ytdlp",
+                new_callable=AsyncMock,
+                side_effect=yt_dlp.utils.DownloadError("HTTP Error 429: Too Many Requests"),
+            ),
+            pytest.raises(EngineRateLimitedError, match="rate-limiting"),
+        ):
+            await engine.transcribe(episode, youtube_delay=0.0)
+
+
+class TestDispatcherCircuitBreaker:
+    @pytest.mark.asyncio
+    async def test_rate_limited_engine_is_benched_for_the_batch(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            side_effect=EngineRateLimitedError("YouTube is rate-limiting requests from this IP (yt-dlp: HTTP 429).")
+        )
+        mock_whisper = MagicMock(spec=WhisperTranscriptionEngine)
+        mock_whisper.is_available.return_value = True
+        mock_whisper.transcribe = AsyncMock(
+            return_value=TranscriptResult(
+                metadata=sample_episode,
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="local whisper")],
+                tier_used="whisper",
+            )
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube, "whisper": mock_whisper},
+        )
+        second_episode = sample_episode.model_copy(
+            update={"episode_id": "syntax-501", "episode_title": "Episode 501: CSS Wizardry"}
+        )
+
+        # First episode: youtube hits the 429, whisper takes over
+        result = await dispatcher.transcribe(sample_episode, engine="auto")
+        assert result.tier_used == "whisper"
+        assert mock_youtube.transcribe.await_count == 1
+        assert "youtube" in dispatcher.disabled_engines
+
+        # Second episode: youtube is not retried, whisper serves again
+        result2 = await dispatcher.transcribe(second_episode, engine="auto")
+        assert result2.tier_used == "whisper"
+        assert mock_youtube.transcribe.await_count == 1
+        assert mock_whisper.transcribe.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_benched_engine_explains_skip_in_errors(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            side_effect=EngineRateLimitedError("YouTube is rate-limiting requests from this IP (yt-dlp: HTTP 429).")
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+        second_episode = sample_episode.model_copy(
+            update={"episode_id": "syntax-501", "episode_title": "Episode 501: CSS Wizardry"}
+        )
+
+        with pytest.raises(TranscriptionEngineError) as first:
+            await dispatcher.transcribe(sample_episode, engine="youtube")
+        assert "Disabled for the rest of this batch" in str(first.value)
+        assert "resumes where it stopped" in str(first.value)
+
+        with pytest.raises(TranscriptionEngineError) as second:
+            await dispatcher.transcribe(second_episode, engine="youtube")
+        assert "disabled earlier in this batch" in str(second.value)
+        assert mock_youtube.transcribe.await_count == 1

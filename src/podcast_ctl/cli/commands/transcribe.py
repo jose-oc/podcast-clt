@@ -296,6 +296,13 @@ def transcribe_command(
             help="Retain downloaded audio files in cache directory after transcription",
         ),
     ] = False,
+    youtube_delay: Annotated[
+        float,
+        typer.Option(
+            "--youtube-delay",
+            help="Base seconds to wait between YouTube subtitle requests (randomized +/-50%; 0 disables pacing)",
+        ),
+    ] = 2.0,
 ) -> None:
     """Transcribe podcast episodes, YouTube videos, or local audio files with multi-tier fallback."""
     # 1. Resolve input source
@@ -384,6 +391,7 @@ def transcribe_command(
 
     success_count = 0
     failure_count = 0
+    disabled_noted: set[str] = set()
 
     for ep_idx, ep in enumerate(selected_episodes, start=1):
         console.rule(f"Episode {ep_idx}/{len(selected_episodes)}: {ep.episode_title}", style="dim cyan")
@@ -413,6 +421,7 @@ def transcribe_command(
                         force=force,
                         model_size=model_size,
                         keep_audio=keep_audio,
+                        youtube_delay=youtube_delay,
                     )
                 )
 
@@ -439,6 +448,17 @@ def transcribe_command(
             console.error(f"Unexpected error processing '{ep.episode_title}'", exception=exc)
             failure_count += 1
 
+        # Surface engines disabled mid-batch (e.g. YouTube rate limiting) once
+        newly_disabled = set(dispatcher.disabled_engines) - disabled_noted
+        for name in sorted(newly_disabled):
+            disabled_noted.add(name)
+            remaining = len(selected_episodes) - ep_idx
+            console.warning(
+                f"Engine '[bold white]{name}[/bold white]' disabled for the rest of the batch: "
+                f"{dispatcher.disabled_engines[name]} "
+                f"The {remaining} remaining episode(s) will use the other engines."
+            )
+
     console.rule("Batch Summary", style="dim cyan")
     if failure_count == 0:
         console.success(f"Completed {success_count} of {len(selected_episodes)} episode(s) successfully.")
@@ -446,5 +466,10 @@ def transcribe_command(
         console.warning(
             f"Completed {success_count} episode(s) with {failure_count} failure(s) out of {len(selected_episodes)} total."
         )
+        if disabled_noted:
+            console.warning(
+                f"Note: engine(s) {', '.join(sorted(disabled_noted))} disabled mid-batch after rate limiting. "
+                "Re-run in a few hours to resume - cached episodes are skipped."
+            )
         if success_count == 0:
             raise typer.Exit(code=1)

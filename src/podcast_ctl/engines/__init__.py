@@ -2,6 +2,7 @@
 
 from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
+    EngineRateLimitedError,
     EngineUnavailableError,
     TranscriptionEngineError,
     TranscriptNotFoundError,
@@ -23,11 +24,13 @@ from podcast_ctl.engines.whisper_engine import (
 from podcast_ctl.engines.youtube_engine import (
     YouTubeTranscriptionEngine,
     extract_youtube_video_id,
+    is_youtube_rate_limit,
 )
 
 __all__ = [
     "BaseTranscriptionEngine",
     "CloudTranscriptionEngine",
+    "EngineRateLimitedError",
     "EngineUnavailableError",
     "RSSTranscriptionEngine",
     "TranscriptNotFoundError",
@@ -37,6 +40,7 @@ __all__ = [
     "YouTubeTranscriptionEngine",
     "detect_optimal_device_and_compute_type",
     "extract_youtube_video_id",
+    "is_youtube_rate_limit",
     "parse_json_transcript",
     "parse_plain_text",
     "parse_srt_content",

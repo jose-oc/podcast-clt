@@ -13,6 +13,7 @@ from podcast_ctl.cli.main import app
 from podcast_ctl.discovery.itunes import PodcastSearchResult
 from podcast_ctl.discovery.resolver import ResolvedSource
 from podcast_ctl.discovery.rss import ShowMetadata
+from podcast_ctl.engines.base import TranscriptionEngineError
 from podcast_ctl.engines.channel_search import ChannelVideo
 from podcast_ctl.models.knowledge import ShowMapping
 from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
@@ -1008,3 +1009,125 @@ def test_log_file_flag_overrides_location(tmp_path: Path) -> None:
     result = runner.invoke(app, ["--log-file", str(custom), "mapping", "list"])
     assert result.exit_code == 0
     assert custom.exists()
+
+
+# =============================================================================
+# YouTube pacing & rate-limit UX tests
+# =============================================================================
+
+
+def test_transcribe_youtube_delay_flag_passed_through(tmp_path: Path) -> None:
+    """--youtube-delay reaches the dispatcher (and defaults to polite pacing)."""
+    mock_episode = EpisodeMetadata(
+        show_title="Podcast Alpha",
+        episode_title="Episode 100",
+        episode_id="alpha-100",
+        duration_seconds=600.0,
+        audio_url="https://audio.com/100.mp3",
+        source_type="rss",
+    )
+    mock_resolved = ResolvedSource(source_type="rss", query="https://alpha.com/feed.xml", episodes=[mock_episode])
+    mock_result = TranscriptResult(
+        metadata=mock_episode,
+        segments=[TranscriptSegment(start=0.0, end=5.0, text="Hello world.")],
+        tier_used="youtube",
+    )
+    with (
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch(
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ) as mock_transcribe,
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "transcribe",
+                "https://alpha.com/feed.xml",
+                "--output-dir",
+                str(tmp_path),
+                "--format",
+                "markdown",
+                "--yes",
+                "--youtube-delay",
+                "5",
+            ],
+        )
+    assert result.exit_code == 0
+    assert mock_transcribe.await_args.kwargs["youtube_delay"] == 5.0
+
+
+def test_transcribe_youtube_delay_default(tmp_path: Path) -> None:
+    """Without the flag, pacing defaults to 2s base."""
+    mock_episode = EpisodeMetadata(
+        show_title="Podcast Alpha",
+        episode_title="Episode 100",
+        episode_id="alpha-100",
+        audio_url="https://audio.com/100.mp3",
+        source_type="rss",
+    )
+    mock_resolved = ResolvedSource(source_type="rss", query="https://alpha.com/feed.xml", episodes=[mock_episode])
+    mock_result = TranscriptResult(
+        metadata=mock_episode,
+        segments=[TranscriptSegment(start=0.0, end=5.0, text="Hello world.")],
+        tier_used="youtube",
+    )
+    with (
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch(
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ) as mock_transcribe,
+    ):
+        result = runner.invoke(
+            app,
+            ["transcribe", "https://alpha.com/feed.xml", "--output-dir", str(tmp_path), "--yes"],
+        )
+    assert result.exit_code == 0
+    assert mock_transcribe.await_args.kwargs["youtube_delay"] == 2.0
+
+
+def test_transcribe_reports_engine_disabled_mid_batch(tmp_path: Path) -> None:
+    """A rate-limited engine is announced once and reflected in the batch summary."""
+    episodes = [
+        EpisodeMetadata(
+            show_title="Podcast Alpha",
+            episode_title=f"Episode {n}",
+            episode_id=f"alpha-{n}",
+            audio_url=f"https://audio.com/{n}.mp3",
+            source_type="rss",
+        )
+        for n in (1, 2)
+    ]
+    mock_resolved = ResolvedSource(source_type="rss", query="https://alpha.com/feed.xml", episodes=episodes)
+
+    async def fake_transcribe(self, episode, **kwargs):
+        self._disabled_engines["youtube"] = "YouTube is rate-limiting requests from this IP (yt-dlp: HTTP 429)."
+        raise TranscriptionEngineError("All transcription engines failed")
+
+    with (
+        patch("podcast_ctl.cli.commands.transcribe.resolve_input", return_value=mock_resolved),
+        patch(
+            "podcast_ctl.engines.dispatcher.TranscriptionDispatcher.transcribe",
+            new=fake_transcribe,
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "transcribe",
+                "https://alpha.com/feed.xml",
+                "--all",
+                "--output-dir",
+                str(tmp_path),
+                "--yes",
+                "--engine",
+                "youtube",
+            ],
+        )
+    output = result.stdout + (result.stderr or "")
+    assert "disabled for the rest of the batch" in output
+    assert "1 remaining episode(s)" in output
+    assert "disabled mid-batch after rate limiting" in output
