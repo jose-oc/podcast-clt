@@ -310,6 +310,9 @@ sells the feature.
 - Vectors are blobs in the same `kb.sqlite` — **exact** cosine in-process, no vector-DB service
 - Optional cloud adapter via env vars: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
 - Switch model or provider → `podcast-ctl kb embed --reindex`
+- `kb embed` shows a real progress bar and the device in use; `--device cpu|mps|cuda` overrides auto-detection
+- `kb search` auto-detects the provider recorded in the index — no `--provider` flag needed
+- Fast local alternative: Ollama via the OpenAI-compatible adapter (~3 min vs ~3 h for a ~3,500-chunk KB on Apple Silicon)
 
 <!--
 Talk track: where do the vectors come from? A local model, bge-m3, good at
