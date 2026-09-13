@@ -19,6 +19,7 @@ from podcast_ctl.kb.embeddings import (
     EmbeddingIdentityMismatch,
     EmbeddingProvider,
     get_embedding_provider,
+    parse_embedding_identity,
 )
 from podcast_ctl.kb.search import (
     MODE_HYBRID,
@@ -180,13 +181,34 @@ def kb_embed(
         console.print("[yellow]Nothing to embed.[/yellow]")
 
 
+def _resolve_search_provider(
+    stored_identity: str | None,
+    provider_name: str | None,
+    model: str | None,
+) -> tuple[str, str | None, bool]:
+    """Pick the provider for a vector/hybrid search.
+
+    Without an explicit ``--provider``, the provider and model recorded in
+    the index win (the identity that produced the stored vectors), so a
+    search never has to repeat what ``kb embed`` already knows. Returns
+    ``(provider_name, model, auto_detected)``.
+    """
+    if provider_name is not None:
+        return provider_name, model, False
+    if stored_identity:
+        identity_provider, identity_model = parse_embedding_identity(stored_identity)
+        if identity_provider:
+            return identity_provider, model or identity_model or None, True
+    return PROVIDER_LOCAL, model, False
+
+
 def _resolve_search(
     store: KbStore,
     query: str,
     mode: str,
     limit: int,
     show: str | None,
-    provider_name: str,
+    provider_name: str | None,
     model: str | None,
 ) -> tuple[list[dict[str, object]], str]:
     """Run the search, resolving 'auto' mode and degrading gracefully.
@@ -202,6 +224,9 @@ def _resolve_search(
     if mode == MODE_LEXICAL:
         return search_kb(store, query, limit=limit, show_id=show), MODE_LEXICAL
 
+    stored_identity = store.embedding_identity()
+    provider_name, model, auto_detected = _resolve_search_provider(stored_identity, provider_name, model)
+
     try:
         backend = get_embedding_provider(provider_name, model)
     except EmbeddingBackendUnavailable as exc:
@@ -211,8 +236,7 @@ def _resolve_search(
         console.error(str(exc))
         raise typer.Exit(code=1) from exc
 
-    stored_identity = store.embedding_identity()
-    if stored_identity and stored_identity != backend.identity():
+    if not auto_detected and stored_identity and stored_identity != backend.identity():
         message = (
             f"Indexed embeddings come from '{stored_identity}', but the selected provider is "
             f"'{backend.identity()}'. Run [bold]podcast-ctl kb embed --reindex[/bold] with the new provider, "
@@ -246,9 +270,14 @@ def kb_search(
         ),
     ] = "auto",
     provider: Annotated[
-        str,
-        typer.Option("--provider", "-p", help="Embedding backend for vector/hybrid modes."),
-    ] = PROVIDER_LOCAL,
+        str | None,
+        typer.Option(
+            "--provider",
+            "-p",
+            help="Embedding backend for vector/hybrid modes. Defaults to the provider that built the index "
+            "(recorded in the KB), falling back to local when the index has no embeddings.",
+        ),
+    ] = None,
     model: Annotated[
         str | None,
         typer.Option("--model", "-m", help="Embedding model name (defaults per provider)."),
