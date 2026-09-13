@@ -28,9 +28,16 @@ from podcast_ctl.engines import (
     parse_timestamp_seconds,
     parse_vtt_content,
 )
+from podcast_ctl.engines.channel_search import (
+    ChannelSearchResult,
+    normalize_title,
+    search_channel_for_episode,
+    title_similarity,
+)
 from podcast_ctl.models import (
     EpisodeMapping,
     EpisodeMetadata,
+    ShowMapping,
     TranscriptResult,
     TranscriptSegment,
 )
@@ -771,4 +778,208 @@ class TestEdgeCases:
         with patch.object(engine, "is_available", return_value=True):
             with pytest.raises(TranscriptionEngineError, match="No valid audio URL"):
                 await engine.transcribe(ep_no_audio)
+
+# =============================================================================
+# 8. YouTube Channel Search Fallback Tests
+# =============================================================================
+
+
+class TestChannelSearch:
+    def test_normalize_title(self) -> None:
+        assert normalize_title("Hello, World!  (2026)") == "hello world 2026"
+        assert normalize_title("  Multiple   Spaces ") == "multiple spaces"
+        assert normalize_title("") == ""
+
+    def test_title_similarity(self) -> None:
+        assert title_similarity("Same Title", "same title") == 1.0
+        assert (
+            title_similarity(
+                "Using AI to Increase Your Intelligence & Enrich Humanity | Dr. Fei-Fei Li",
+                "Using AI to Increase Your Intelligence and Enrich Humanity | Dr. Fei-Fei Li",
+            )
+            > 0.9
+        )
+        assert title_similarity("Cats and dogs", "quantum physics lecture") < 0.5
+        assert title_similarity("", "anything") == 0.0
+
+    def _mock_yt_dlp(self, entries: list[dict]) -> MagicMock:
+        mock_ydl_cls = MagicMock()
+        mock_ydl = mock_ydl_cls.return_value.__enter__.return_value
+        mock_ydl.extract_info.return_value = {"entries": entries}
+        return mock_ydl_cls
+
+    def test_search_channel_matches_close_title(self) -> None:
+        entries = [
+            {"id": "xyz123abc00", "title": "Completely unrelated video"},
+            {
+                "id": "N5AQFYtqx8Q",
+                "title": "Using AI to Increase Your Intelligence & Enrich Humanity | Dr. Fei-Fei Li",
+            },
+        ]
+        with patch("podcast_ctl.engines.channel_search.yt_dlp.YoutubeDL", self._mock_yt_dlp(entries)):
+            result = search_channel_for_episode(
+                "https://www.youtube.com/@hubermanlab",
+                "Using AI to Increase Your Intelligence and Enrich Humanity | Dr. Fei-Fei Li",
+            )
+        assert result.video_url == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
+        assert result.matched_title is not None
+        assert result.similarity >= 0.75
+        assert result.videos_searched == 2
+
+    def test_search_channel_rejects_below_threshold(self) -> None:
+        entries = [
+            {"id": "xyz123abc00", "title": "Completely unrelated video"},
+            {"id": "def456ghi00", "title": "Another unrelated episode"},
+        ]
+        with patch("podcast_ctl.engines.channel_search.yt_dlp.YoutubeDL", self._mock_yt_dlp(entries)):
+            result = search_channel_for_episode(
+                "https://www.youtube.com/@hubermanlab",
+                "Using AI to Increase Your Intelligence | Dr. Fei-Fei Li",
+            )
+        assert result.video_url is None
+        assert result.videos_searched == 2
+        assert result.best_similarity < 0.75
+
+    def test_search_channel_empty_channel(self) -> None:
+        with patch("podcast_ctl.engines.channel_search.yt_dlp.YoutubeDL", self._mock_yt_dlp([])):
+            result = search_channel_for_episode(
+                "https://www.youtube.com/@empty",
+                "Any title",
+            )
+        assert result.video_url is None
+        assert result.videos_searched == 0
+
+
+class TestDispatcherChannelFallback:
+    @pytest.mark.asyncio
+    async def test_show_channel_mapping_resolves_video_and_learns_mapping(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.example.com/syntax",
+                show_title="syntax",
+                youtube_channel_url="https://www.youtube.com/@syntaxfm",
+            )
+        )
+
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            return_value=TranscriptResult(
+                metadata=sample_episode,
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="YouTube captions")],
+                tier_used="youtube",
+            )
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+
+        fake_search = ChannelSearchResult(
+            video_url="https://www.youtube.com/watch?v=N5AQFYtqx8Q",
+            matched_title="Episode 500: Rust for JS Devs",
+            similarity=1.0,
+            videos_searched=10,
+            best_similarity=1.0,
+        )
+        with patch(
+            "podcast_ctl.engines.dispatcher.search_channel_for_episode",
+            return_value=fake_search,
+        ) as search_mock:
+            result = await dispatcher.transcribe(sample_episode, engine="youtube")
+
+        assert result.tier_used == "youtube"
+        _, kwargs = mock_youtube.transcribe.call_args
+        assert kwargs["youtube_url"] == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
+        search_mock.assert_called_once_with(
+            "https://www.youtube.com/@syntaxfm", "Episode 500: Rust for JS Devs"
+        )
+
+        # The discovered mapping is auto-learned as unconfirmed
+        learned = memory_repo.get_episode_mapping("syntax", "syntax-500")
+        assert learned is not None
+        assert learned.youtube_video_url == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
+        assert learned.confirmed_by_user is False
+
+    @pytest.mark.asyncio
+    async def test_show_channel_mapping_no_match_reports_diagnostics(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.example.com/syntax",
+                show_title="syntax",
+                youtube_channel_url="https://www.youtube.com/@syntaxfm",
+            )
+        )
+
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            side_effect=TranscriptNotFoundError("No YouTube video ID could be resolved")
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+
+        fake_search = ChannelSearchResult(videos_searched=7, best_similarity=0.42)
+        with patch(
+            "podcast_ctl.engines.dispatcher.search_channel_for_episode",
+            return_value=fake_search,
+        ):
+            with pytest.raises(TranscriptionEngineError) as exc_info:
+                await dispatcher.transcribe(sample_episode, engine="youtube")
+
+        message = str(exc_info.value)
+        assert "none of its 7 recent videos" in message
+        assert "mapping add episode" in message
+
+    @pytest.mark.asyncio
+    async def test_episode_mapping_takes_precedence_over_channel_search(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.example.com/syntax",
+                show_title="syntax",
+                youtube_channel_url="https://www.youtube.com/@syntaxfm",
+            )
+        )
+        memory_repo.save_episode_mapping(
+            EpisodeMapping(
+                show_id="syntax",
+                episode_id="syntax-500",
+                youtube_video_url="https://www.youtube.com/watch?v=explicit01",
+            )
+        )
+
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            return_value=TranscriptResult(
+                metadata=sample_episode,
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="YouTube captions")],
+                tier_used="youtube",
+            )
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+
+        with patch(
+            "podcast_ctl.engines.dispatcher.search_channel_for_episode"
+        ) as search_mock:
+            result = await dispatcher.transcribe(sample_episode, engine="youtube")
+
+        assert result.tier_used == "youtube"
+        _, kwargs = mock_youtube.transcribe.call_args
+        assert kwargs["youtube_url"] == "https://www.youtube.com/watch?v=explicit01"
+        search_mock.assert_not_called()
 

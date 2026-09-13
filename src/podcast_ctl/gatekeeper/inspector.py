@@ -150,7 +150,7 @@ class PreFlightInspector:
                     chosen_tier = "youtube"
                 elif (
                     repo is not None
-                    and (show_mapping := repo.get_show_mapping(show_id)) is not None
+                    and (show_mapping := repo.find_show_mapping(show_id)) is not None
                     and show_mapping.youtube_channel_url
                 ):
                     chosen_tier = "youtube"

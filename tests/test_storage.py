@@ -489,6 +489,26 @@ class TestRepositoryTranscripts:
 
 
 class TestRepositoryMappings:
+    def test_find_show_mapping_by_feed_url_or_title(
+        self, memory_repo: StorageRepository
+    ) -> None:
+        mapping = ShowMapping(
+            feed_url="https://feeds.example.com/show.rss",
+            show_title="My Show",
+            youtube_channel_url="https://youtube.com/@myshow",
+        )
+        memory_repo.save_show_mapping(mapping)
+
+        by_feed = memory_repo.find_show_mapping("https://feeds.example.com/show.rss")
+        assert by_feed is not None
+        assert by_feed.show_title == "My Show"
+
+        by_title = memory_repo.find_show_mapping("My Show")
+        assert by_title is not None
+        assert by_title.feed_url == "https://feeds.example.com/show.rss"
+
+        assert memory_repo.find_show_mapping("Unknown Show") is None
+
     def test_show_mapping_crud(self, memory_repo: StorageRepository) -> None:
         mapping = ShowMapping(
             feed_url="https://lexfridman.com/feed/podcast/",

@@ -60,6 +60,7 @@ podcast-ctl inspect <input_source> [OPTIONS]
 #### Options
 * `--engine` *(string, default: "auto")*: Target transcription engine (`auto`, `rss`, `youtube`, `whisper`, `groq`, `openai`).
 * `--limit`, `-n` *(int, default: 20)*: Maximum number of episodes to list in detailed table.
+* `--guids`, `-g` *(bool, default: False)*: Also print a plain, copyable list of episode GUIDs and titles. The episode table shows a truncated **Episode GUID** column; use this flag to get full GUIDs for `mapping add episode`.
 
 #### Examples
 ```bash
@@ -177,11 +178,20 @@ Associate a podcast RSS feed with a YouTube channel.
 podcast-ctl mapping add show <feed_url> <youtube_channel_url> [--title <title>]
 ```
 
+Without `--title`, the show title is resolved from the feed itself (needs network); if the feed cannot be fetched, the feed URL is stored as the title with a warning.
+
+When a show has a channel mapping, transcription with the `youtube` engine (directly or via `auto`) works even without per-episode mappings: if no episode mapping matches, the channel's recent videos (up to 60) are searched for a title closely matching the episode title. Titles are normalized (lowercase, punctuation stripped) and compared by similarity ratio; a match is accepted at 0.75 or higher. Accepted matches are stored as auto-discovered (unconfirmed) episode mappings, so each episode is only searched once. If nothing matches, the error message reports how many videos were searched and the best similarity found.
+
 #### `mapping add episode`
 Associate a specific podcast episode with a direct YouTube video URL.
 ```bash
-podcast-ctl mapping add episode <show_id> <episode_id> <youtube_video_url>
+podcast-ctl mapping add episode <show_id> <episode_id_or_title> <youtube_video_url>
 ```
+
+* `<show_id>`: the show title exactly as it appears in the RSS feed (e.g. `"Huberman Lab"`) or the RSS feed URL.
+* `<episode_id_or_title>`: the episode's **RSS GUID** or its exact title. A title is resolved to its GUID by fetching the feed (needs network); the transcription-time lookup is always `show title + GUID`, so a mapping stored under a raw title never matches.
+
+Find an episode's GUID with `podcast-ctl inspect <show> --guids` (or the Episode GUID column in the inspect table, truncated in narrow terminals). If the feed cannot be fetched, the value is stored as provided with a warning, so explicit GUID mappings still work offline.
 
 #### `mapping remove show`
 Delete a Show $\leftrightarrow$ YouTube Channel mapping.
