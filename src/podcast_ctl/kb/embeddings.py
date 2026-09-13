@@ -35,6 +35,9 @@ PROVIDER_OPENAI_COMPATIBLE = "openai-compatible"
 ENV_EMBED_BASE_URL = "PODCAST_CTL_EMBED_BASE_URL"
 ENV_EMBED_API_KEY = "PODCAST_CTL_EMBED_API_KEY"
 ENV_EMBED_MODEL = "PODCAST_CTL_EMBED_MODEL"
+# Optional device override for the local backend (cpu / mps / cuda). When
+# unset, sentence-transformers auto-selects the best available device.
+ENV_EMBED_DEVICE = "PODCAST_CTL_EMBED_DEVICE"
 
 
 class EmbeddingBackendUnavailable(RuntimeError):
@@ -106,7 +109,7 @@ class SentenceTransformerProvider:
     and imported lazily so the rest of the CLI never pays for torch.
     """
 
-    def __init__(self, model: str = DEFAULT_EMBEDDING_MODEL) -> None:
+    def __init__(self, model: str = DEFAULT_EMBEDDING_MODEL, device: str | None = None) -> None:
         try:
             import sentence_transformers
             from sentence_transformers import SentenceTransformer
@@ -117,8 +120,17 @@ class SentenceTransformerProvider:
             ) from exc
         self._model_name = model
         self._version = sentence_transformers.__version__
-        self._st = SentenceTransformer(model)
+        requested = device or os.environ.get(ENV_EMBED_DEVICE) or None
+        # None lets sentence-transformers auto-select (cuda/mps when
+        # available, cpu otherwise); an explicit value is passed through.
+        self._st = SentenceTransformer(model, device=requested)
+        self._device = str(self._st.device)
         self._dims = int(self._st.get_sentence_embedding_dimension() or 0)
+
+    @property
+    def device(self) -> str:
+        """Torch device the model runs on, e.g. ``cpu``, ``mps`` or ``cuda``."""
+        return self._device
 
     @property
     def provider(self) -> str:
@@ -169,6 +181,11 @@ class OpenAICompatibleProvider:
         self._dims = 0
 
     @property
+    def device(self) -> str:
+        """Where the vectors are computed: on the remote endpoint, not locally."""
+        return "remote (API endpoint)"
+
+    @property
     def provider(self) -> str:
         return PROVIDER_OPENAI_COMPATIBLE
 
@@ -212,16 +229,23 @@ class OpenAICompatibleProvider:
         return vectors
 
 
-def get_embedding_provider(name: str = PROVIDER_LOCAL, model: str | None = None) -> EmbeddingProvider:
+def get_embedding_provider(
+    name: str = PROVIDER_LOCAL,
+    model: str | None = None,
+    device: str | None = None,
+) -> EmbeddingProvider:
     """Build an embedding provider by name.
 
     ``local`` (default) runs sentence-transformers on the user's machine;
     ``openai-compatible`` is the optional cloud adapter configured through
-    environment variables. Raises ``EmbeddingBackendUnavailable`` with a
-    setup hint when the backend cannot be used.
+    environment variables. ``device`` (cpu / mps / cuda) applies to the local
+    backend only. Raises ``EmbeddingBackendUnavailable`` with a setup hint
+    when the backend cannot be used.
     """
     if name == PROVIDER_LOCAL:
-        return SentenceTransformerProvider(model or os.environ.get(ENV_EMBED_MODEL) or DEFAULT_EMBEDDING_MODEL)
+        return SentenceTransformerProvider(
+            model or os.environ.get(ENV_EMBED_MODEL) or DEFAULT_EMBEDDING_MODEL, device=device
+        )
     if name == PROVIDER_OPENAI_COMPATIBLE:
         base_url = os.environ.get(ENV_EMBED_BASE_URL, "").strip()
         api_key = os.environ.get(ENV_EMBED_API_KEY, "").strip()

@@ -51,13 +51,21 @@ def _open_store(kb_dir: Path | None) -> KbStore:
     return KbStore(kb_db_path(root))
 
 
-def _load_provider(provider: str, model: str | None) -> EmbeddingProvider:
+DEVICE_CHOICES = ("auto", "cpu", "mps", "cuda")
+
+
+def _load_provider(provider: str, model: str | None, device: str | None = None) -> EmbeddingProvider:
     """Build the embedding provider or exit with the setup hint."""
     try:
-        return get_embedding_provider(provider, model)
+        return get_embedding_provider(provider, model, device=device)
     except EmbeddingBackendUnavailable as exc:
         console.error(str(exc))
         raise typer.Exit(code=1) from exc
+
+
+def _describe_device(backend: EmbeddingProvider) -> str:
+    """Human-readable device line for the provider (local torch device or remote)."""
+    return str(getattr(backend, "device", "unknown"))
 
 
 @kb_app.command("build")
@@ -123,6 +131,14 @@ def kb_embed(
         int,
         typer.Option("--batch-size", help="Texts per embedding call."),
     ] = DEFAULT_BATCH_SIZE,
+    device: Annotated[
+        str,
+        typer.Option(
+            "--device",
+            help="Device for the local backend: auto (default, best available), cpu, mps (Apple Silicon GPU) "
+            "or cuda. Can also be set with PODCAST_CTL_EMBED_DEVICE. Ignored by the openai-compatible provider.",
+        ),
+    ] = "auto",
     kb_dir: Annotated[
         Path | None,
         typer.Option("--kb-dir", help="Override the knowledge base directory."),
@@ -140,8 +156,12 @@ def kb_embed(
         console.print("[yellow]No indexed chunks found.[/yellow] Run [bold]podcast-ctl kb build[/bold] first.")
         raise typer.Exit(code=1)
 
-    backend = _load_provider(provider, model)
+    if device not in DEVICE_CHOICES:
+        console.error(f"Unknown device '{device}'. Available: {', '.join(DEVICE_CHOICES)}.")
+        raise typer.Exit(code=1)
+    backend = _load_provider(provider, model, device=None if device == "auto" else device)
     console.print(f"[bold cyan]Embedding provider:[/bold cyan] {backend.identity()}")
+    console.print(f"[bold cyan]Embedding device:[/bold cyan] {_describe_device(backend)}")
 
     with console.task_progress("Embedding chunks") as update:
         try:

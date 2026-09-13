@@ -359,7 +359,7 @@ def test_cli_embed_and_search_hybrid(monkeypatch: pytest.MonkeyPatch) -> None:
     seed_kb()
     monkeypatch.setattr(
         "podcast_ctl.cli.commands.kb.get_embedding_provider",
-        lambda name="local", model=None: StubProvider(),
+        lambda name="local", model=None, device=None: StubProvider(),
     )
 
     result = runner.invoke(app, ["kb", "embed"])
@@ -396,7 +396,7 @@ def test_cli_search_auto_degrades_when_provider_missing(monkeypatch: pytest.Monk
     builder = seed_kb()
     embed_kb(builder.store, StubProvider())
 
-    def unavailable(name: str = "local", model: str | None = None) -> StubProvider:
+    def unavailable(name: str = "local", model: str | None = None, device: str | None = None) -> StubProvider:
         raise EmbeddingBackendUnavailable("no backend")
 
     monkeypatch.setattr("podcast_ctl.cli.commands.kb.get_embedding_provider", unavailable)
@@ -414,7 +414,7 @@ def test_cli_search_identity_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     embed_kb(builder.store, StubProvider(model="stub-model"))
     monkeypatch.setattr(
         "podcast_ctl.cli.commands.kb.get_embedding_provider",
-        lambda name="local", model=None: StubProvider(model="other-model"),
+        lambda name="local", model=None, device=None: StubProvider(model="other-model"),
     )
 
     # Auto degrades to lexical with a warning.
@@ -433,7 +433,7 @@ def test_cli_embed_requires_matching_provider(monkeypatch: pytest.MonkeyPatch) -
     embed_kb(builder.store, StubProvider(model="stub-model"))
     monkeypatch.setattr(
         "podcast_ctl.cli.commands.kb.get_embedding_provider",
-        lambda name="local", model=None: StubProvider(model="other-model"),
+        lambda name="local", model=None, device=None: StubProvider(model="other-model"),
     )
 
     result = runner.invoke(app, ["kb", "embed"])
@@ -445,10 +445,26 @@ def test_cli_embed_requires_matching_provider(monkeypatch: pytest.MonkeyPatch) -
     assert "Removed" in result.output
 
 
+def test_cli_embed_logs_device_and_validates_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    seed_kb()
+    monkeypatch.setattr(
+        "podcast_ctl.cli.commands.kb.get_embedding_provider",
+        lambda name="local", model=None, device=None: StubProvider(),
+    )
+
+    result = runner.invoke(app, ["kb", "embed"])
+    assert result.exit_code == 0, result.output
+    assert "Embedding device:" in result.output
+
+    result = runner.invoke(app, ["kb", "embed", "--device", "tpu"])
+    assert result.exit_code == 1
+    assert "Unknown device" in result.output
+
+
 def test_cli_embed_missing_backend_hint(monkeypatch: pytest.MonkeyPatch) -> None:
     seed_kb()
 
-    def unavailable(name: str = "local", model: str | None = None) -> StubProvider:
+    def unavailable(name: str = "local", model: str | None = None, device: str | None = None) -> StubProvider:
         raise EmbeddingBackendUnavailable("Install it with: pip install 'podcast-ctl[embeddings]'")
 
     monkeypatch.setattr("podcast_ctl.cli.commands.kb.get_embedding_provider", unavailable)
