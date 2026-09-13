@@ -31,6 +31,10 @@ class BaseTranscriptionEngine(ABC):
         """Check whether the engine is available in the current runtime environment."""
         pass
 
+    def unavailable_reason(self) -> str | None:
+        """Why the engine is unavailable (missing package, API key, ...), or None if available."""
+        return None
+
     @abstractmethod
     async def transcribe(
         self,

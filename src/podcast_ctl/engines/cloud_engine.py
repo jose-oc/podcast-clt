@@ -92,6 +92,15 @@ class CloudTranscriptionEngine(BaseTranscriptionEngine):
         """Check if an API key is configured for the cloud provider."""
         return bool(self.api_key)
 
+    def unavailable_reason(self) -> str | None:
+        """Name the environment variable holding the missing API key."""
+        if self.api_key:
+            return None
+        env_var = {"groq": "GROQ_API_KEY", "openai": "OPENAI_API_KEY"}.get(self.provider)
+        if env_var:
+            return f"no API key configured - set {env_var}"
+        return "no API key configured - set GROQ_API_KEY or OPENAI_API_KEY"
+
     async def _download_audio(self, url: str, target_path: Path) -> None:
         """Download remote audio to a local path."""
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:

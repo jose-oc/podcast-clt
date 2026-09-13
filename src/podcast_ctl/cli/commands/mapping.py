@@ -8,8 +8,13 @@ import typer
 from rich.table import Table
 
 from podcast_ctl.discovery.resolver import resolve_input
+from podcast_ctl.engines.channel_search import (
+    DEFAULT_SIMILARITY_THRESHOLD,
+    list_channel_videos,
+    match_episode_to_videos,
+)
 from podcast_ctl.gatekeeper.learning import KnowledgeLearner
-from podcast_ctl.models.knowledge import ShowMapping
+from podcast_ctl.models.knowledge import EpisodeMapping, ShowMapping
 from podcast_ctl.storage.repository import StorageRepository
 from podcast_ctl.ui.console import console
 
@@ -19,11 +24,27 @@ mapping_app = typer.Typer(
 )
 
 mapping_add_app = typer.Typer(
-    help="Add a new YouTube channel or video mapping.",
+    help="""Add a mapping. COMMAND picks what to map: 'show' or 'episode'.
+
+\b
+Examples:
+  podcast-ctl mapping add show <feed_url> <channel_url>
+  podcast-ctl mapping add episode "Huberman Lab" "<episode title or RSS GUID>" <video_url>
+
+To match every episode of a show against its whole YouTube channel in one
+pass, use 'podcast-ctl mapping sync <show>' instead of adding episodes one
+by one.""",
     no_args_is_help=True,
 )
 mapping_remove_app = typer.Typer(
-    help="Remove an existing YouTube mapping.",
+    help="""Remove a mapping. COMMAND picks what to unmap: 'show' or 'episode'.
+
+\b
+Examples:
+  podcast-ctl mapping remove show <feed_url>
+  podcast-ctl mapping remove episode "Huberman Lab" "<episode RSS GUID>"
+
+Run 'podcast-ctl mapping list' first to see the exact identifiers stored.""",
     no_args_is_help=True,
 )
 
@@ -246,3 +267,144 @@ def remove_episode_mapping(
         console.success(f"Removed episode mapping for '[bold white]{show_id}::{episode_id}[/bold white]'.")
     else:
         console.warning(f"No episode mapping found for '[bold white]{show_id}::{episode_id}[/bold white]'.")
+
+
+@mapping_app.command("sync")
+def sync_mappings(
+    show: Annotated[str, typer.Argument(help="Show title (as in the RSS feed) or RSS feed URL")],
+    channel: Annotated[
+        str | None,
+        typer.Option(
+            "--channel",
+            "-c",
+            help="YouTube channel URL (default: the channel of the stored show mapping)",
+        ),
+    ] = None,
+    threshold: Annotated[
+        float,
+        typer.Option(help="Minimum normalized title similarity (0-1) to accept a match"),
+    ] = DEFAULT_SIMILARITY_THRESHOLD,
+    max_videos: Annotated[
+        int | None,
+        typer.Option(
+            "--max-videos",
+            help="Search only the N most recent channel videos (default: the full channel catalog)",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Report the matches found without saving anything"),
+    ] = False,
+) -> None:
+    """Match every episode of a show against its YouTube channel in one pass.
+
+    The feed and the channel catalog are each listed once and every episode
+    title is compared locally, so large back catalogs do not cost one request
+    per episode. Accepted matches are stored as auto-discovered (unconfirmed)
+    episode mappings; episodes that already have a mapping are left untouched.
+
+    Use this when the per-episode fallback during transcription cannot reach
+    an episode: that fallback only searches the 60 most recent channel videos.
+    """
+    if not 0.0 < threshold <= 1.0:
+        console.error(f"--threshold must be in (0, 1], got {threshold}.")
+        raise typer.Exit(code=2)
+
+    # 1. Fetch the feed once (search term or feed URL)
+    with console.status_spinner(f"Fetching feed for '[bold white]{show}[/bold white]'..."):
+        try:
+            resolved = resolve_input(show.strip())
+            if resolved.source_type == "search":
+                if not resolved.search_results or not resolved.search_results[0].feed_url:
+                    raise ValueError("no RSS feed found for that show")
+                resolved = resolve_input(resolved.search_results[0].feed_url)
+            episodes = resolved.episodes
+            if not episodes:
+                raise ValueError("no episodes found in the feed")
+        except Exception as exc:
+            console.error(f"Could not fetch the feed for '[bold white]{show}[/bold white]': {exc}")
+            raise typer.Exit(code=1) from exc
+
+    canonical_show_id = episodes[0].effective_show_id
+    feed_url = resolved.show_metadata.feed_url if resolved.show_metadata else None
+
+    # 2. Resolve the channel: --channel wins, otherwise the stored show mapping
+    repo = StorageRepository()
+    channel_url = channel.strip() if channel else None
+    if channel_url is None:
+        show_mapping = repo.find_show_mapping(canonical_show_id)
+        if show_mapping is None and feed_url:
+            show_mapping = repo.find_show_mapping(feed_url)
+        if show_mapping and show_mapping.youtube_channel_url:
+            channel_url = show_mapping.youtube_channel_url
+        else:
+            console.error(
+                f"No YouTube channel known for '[bold white]{canonical_show_id}[/bold white]'. "
+                "Pass --channel <url> or add one with 'podcast-ctl mapping add show'."
+            )
+            raise typer.Exit(code=1)
+
+    # 3. List the channel catalog once
+    scope = f"{max_videos} most recent videos" if max_videos else "full catalog"
+    with console.status_spinner(f"Listing the {scope} of [dim underline]{channel_url}[/dim underline]..."):
+        try:
+            videos = list_channel_videos(channel_url, max_videos=max_videos)
+        except Exception as exc:
+            console.error(f"Could not list the videos of [dim underline]{channel_url}[/dim underline]: {exc}")
+            raise typer.Exit(code=1) from exc
+    if not videos:
+        console.error(f"No videos found on [dim underline]{channel_url}[/dim underline].")
+        raise typer.Exit(code=1)
+
+    # 4. Match every episode locally
+    matched: list[tuple[str, str, float]] = []
+    unmatched: list[tuple[str, float]] = []
+    already_mapped = 0
+    for ep in episodes:
+        if repo.get_episode_mapping(canonical_show_id, ep.episode_id) is not None:
+            already_mapped += 1
+            continue
+        result = match_episode_to_videos(ep.episode_title, videos, threshold=threshold)
+        if result.video_url:
+            matched.append((ep.episode_title, result.video_url, result.similarity))
+            if not dry_run:
+                repo.save_episode_mapping(
+                    EpisodeMapping(
+                        show_id=canonical_show_id,
+                        episode_id=ep.episode_id,
+                        youtube_video_url=result.video_url,
+                        confirmed_by_user=False,
+                    )
+                )
+        else:
+            unmatched.append((ep.episode_title, result.best_similarity))
+
+    # 5. Report
+    verb = "Would save" if dry_run else "Saved"
+    console.success(
+        f"{verb} {len(matched)} episode mapping(s) for '[bold white]{canonical_show_id}[/bold white]' "
+        f"({len(videos)} channel videos searched, similarity >= {threshold:.2f}). "
+        f"{already_mapped} episode(s) already had a mapping; {len(unmatched)} had no close match."
+    )
+    if matched:
+        match_table = Table(
+            title="[bold cyan]Matched episodes[/bold cyan]",
+            border_style="dim blue",
+            header_style="bold cyan",
+            show_lines=False,
+        )
+        match_table.add_column("Episode title", style="bold white", min_width=30, overflow="ellipsis", no_wrap=True)
+        match_table.add_column("YouTube video", style="dim underline", min_width=35)
+        match_table.add_column("Similarity", justify="right", width=10)
+        for title, url, score in matched[:20]:
+            match_table.add_row(title, url, f"{score:.0%}")
+        console.print(match_table)
+        if len(matched) > 20:
+            console.info(f"... and {len(matched) - 20} more matched episode(s).")
+    if unmatched:
+        unmatched.sort(key=lambda item: item[1], reverse=True)
+        console.info("Closest unmatched episodes (need an explicit 'mapping add episode' or a lower --threshold):")
+        for title, score in unmatched[:10]:
+            console.print(f"  • [dim]{title}[/dim] (best similarity {score:.0%})")
+        if len(unmatched) > 10:
+            console.info(f"... and {len(unmatched) - 10} more unmatched episode(s).")

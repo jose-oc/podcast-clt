@@ -12,7 +12,12 @@ from podcast_ctl.engines.base import (
     TranscriptionEngineError,
     TranscriptNotFoundError,
 )
-from podcast_ctl.engines.channel_search import search_channel_for_episode
+from podcast_ctl.engines.channel_search import (
+    DEFAULT_MAX_VIDEOS,
+    ChannelVideo,
+    list_channel_videos,
+    match_episode_to_videos,
+)
 from podcast_ctl.engines.cloud_engine import CloudTranscriptionEngine
 from podcast_ctl.engines.rss_engine import RSSTranscriptionEngine
 from podcast_ctl.engines.whisper_engine import WhisperTranscriptionEngine
@@ -48,6 +53,14 @@ class TranscriptionDispatcher:
             "openai": CloudTranscriptionEngine(provider="openai"),
             "cloud": CloudTranscriptionEngine(provider="groq"),
         }
+
+        # Channel listings cached per channel URL for the lifetime of this
+        # dispatcher: without it, a batch of N episodes with a show->channel
+        # mapping would list the same channel N times. None marks a listing
+        # that already failed, so a throttled channel is not retried per
+        # episode.
+        self._channel_catalog_cache: dict[str, list[ChannelVideo] | None] = {}
+        self._channel_catalog_errors: dict[str, Exception] = {}
 
     def register_engine(self, name: str, engine: BaseTranscriptionEngine) -> None:
         """Register or replace a transcription engine by name."""
@@ -113,6 +126,9 @@ class TranscriptionDispatcher:
 
         # 2b. Fallback: Show -> YouTube Channel mapping. Search the channel's
         # recent videos for a title that closely matches the episode title.
+        # The channel listing is cached on this dispatcher, so a batch only
+        # lists each channel once; older episodes outside the recent window
+        # need 'podcast-ctl mapping sync' or an explicit episode mapping.
         channel_search_note: str | None = None
         if (
             mapped_youtube_url is None
@@ -124,18 +140,25 @@ class TranscriptionDispatcher:
             show_mapping = self.storage_repo.find_show_mapping(show_id)
             if show_mapping and show_mapping.youtube_channel_url:
                 channel_url = show_mapping.youtube_channel_url
-                try:
-                    search = await asyncio.to_thread(
-                        search_channel_for_episode,
-                        channel_url,
-                        episode.episode_title,
-                    )
-                except Exception as exc:
-                    logger.info(f"YouTube channel search failed for '{channel_url}': {exc}")
+                if channel_url not in self._channel_catalog_cache:
+                    try:
+                        self._channel_catalog_cache[channel_url] = await asyncio.to_thread(
+                            list_channel_videos,
+                            channel_url,
+                            DEFAULT_MAX_VIDEOS,
+                        )
+                    except Exception as exc:
+                        logger.info(f"YouTube channel listing failed for '{channel_url}': {exc}")
+                        self._channel_catalog_cache[channel_url] = None
+                        self._channel_catalog_errors[channel_url] = exc
+                videos = self._channel_catalog_cache[channel_url]
+                if videos is None:
                     channel_search_note = (
-                        f"[youtube] Show mapping points to channel {channel_url} but searching it failed: {exc}"
+                        f"[youtube] Show mapping points to channel {channel_url} but listing its videos failed: "
+                        f"{self._channel_catalog_errors[channel_url]}"
                     )
                 else:
+                    search = match_episode_to_videos(episode.episode_title, videos)
                     if search.video_url:
                         mapped_youtube_url = search.video_url
                         logger.info(
@@ -156,7 +179,8 @@ class TranscriptionDispatcher:
                             f"[youtube] Show mapping points to channel {channel_url}, but none of its "
                             f"{search.videos_searched} recent videos closely matches "
                             f"'{episode.episode_title}' (best similarity {search.best_similarity:.0%}). "
-                            "Add an explicit mapping with 'podcast-ctl mapping add episode'."
+                            "For older episodes, run 'podcast-ctl mapping sync <show>' to match the whole "
+                            "channel catalog, or add an explicit mapping with 'podcast-ctl mapping add episode'."
                         )
         attempt_errors: list[str] = []
 
@@ -169,7 +193,8 @@ class TranscriptionDispatcher:
 
             if not eng.is_available():
                 logger.debug(f"Skipping engine '{eng_name}' (not available in current environment)")
-                attempt_errors.append(f"[{eng_name}] Not available (missing dependencies or API key)")
+                reason = eng.unavailable_reason() or "missing dependencies or API key"
+                attempt_errors.append(f"[{eng_name}] Not available ({reason})")
                 continue
 
             # Pass mapped YouTube URL if engine is youtube

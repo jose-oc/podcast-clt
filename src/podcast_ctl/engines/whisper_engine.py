@@ -80,6 +80,15 @@ class WhisperTranscriptionEngine(BaseTranscriptionEngine):
         except ImportError:
             return False
 
+    def unavailable_reason(self) -> str | None:
+        """Explain how to install the missing faster-whisper dependency."""
+        if self.is_available():
+            return None
+        return (
+            "faster-whisper is not installed - install it with "
+            "'uv sync --extra whisper' (or: pip install 'podcast-ctl[whisper]')"
+        )
+
     def get_model(self, model_size: str, device: str, compute_type: str) -> Any:
         """Load or retrieve cached WhisperModel instance."""
         try:

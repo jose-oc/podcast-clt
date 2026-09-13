@@ -13,6 +13,8 @@ from podcast_ctl.cli.main import app
 from podcast_ctl.discovery.itunes import PodcastSearchResult
 from podcast_ctl.discovery.resolver import ResolvedSource
 from podcast_ctl.discovery.rss import ShowMetadata
+from podcast_ctl.engines.channel_search import ChannelVideo
+from podcast_ctl.models.knowledge import ShowMapping
 from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
 from podcast_ctl.storage.repository import StorageRepository
 
@@ -867,3 +869,142 @@ def test_transcribe_cloud_guardrail_declined() -> None:
         )
         assert result.exit_code == 1
         assert "Skipping cloud transcription" in result.stdout
+
+
+# =============================================================================
+# Mapping sync & help-text tests
+# =============================================================================
+
+
+def _sync_episode(episode_id: str, title: str) -> EpisodeMetadata:
+    return EpisodeMetadata(
+        show_title="My Show",
+        episode_title=title,
+        episode_id=episode_id,
+        audio_url=f"https://audio.example.com/{episode_id}.mp3",
+    )
+
+
+def test_mapping_group_help_explains_command() -> None:
+    """The add/remove group help explains that COMMAND is the mapping kind, with examples."""
+    res_add = runner.invoke(app, ["mapping", "add", "--help"])
+    assert res_add.exit_code == 0
+    assert "COMMAND" in res_add.stdout
+    assert "show" in res_add.stdout
+    assert "episode" in res_add.stdout
+    assert "Examples" in res_add.stdout
+
+    res_remove = runner.invoke(app, ["mapping", "remove", "--help"])
+    assert res_remove.exit_code == 0
+    assert "Examples" in res_remove.stdout
+    assert "mapping list" in res_remove.stdout
+
+
+def test_mapping_sync_matches_full_catalog() -> None:
+    """mapping sync lists the channel once and stores accepted matches as unconfirmed."""
+    episodes = [
+        _sync_episode("ep-1", "Episode One: Python"),
+        _sync_episode("ep-2", "Episode Two: Rust"),
+        _sync_episode("ep-3", "Episode Three: Obscure Topic"),
+    ]
+    catalog = [
+        ChannelVideo(video_id="vid0000001a", title="Episode One: Python"),
+        ChannelVideo(video_id="vid0000002b", title="Episode Two: Rust"),
+    ]
+    with (
+        patch("podcast_ctl.cli.commands.mapping.resolve_input", return_value=_mock_rss_resolved(episodes)),
+        patch("podcast_ctl.cli.commands.mapping.list_channel_videos", return_value=catalog) as list_mock,
+    ):
+        result = runner.invoke(app, ["mapping", "sync", "My Show", "--channel", "https://youtube.com/@show"])
+
+    assert result.exit_code == 0
+    assert "Saved 2 episode mapping(s)" in result.stdout
+    assert "1 had no close match" in result.stdout
+    list_mock.assert_called_once_with("https://youtube.com/@show", max_videos=None)
+
+    repo = StorageRepository()
+    m1 = repo.get_episode_mapping("My Show", "ep-1")
+    assert m1 is not None and m1.youtube_video_url.endswith("vid0000001a") and m1.confirmed_by_user is False
+    assert repo.get_episode_mapping("My Show", "ep-2") is not None
+    assert repo.get_episode_mapping("My Show", "ep-3") is None
+
+    # Second run: existing mappings are left untouched
+    with (
+        patch("podcast_ctl.cli.commands.mapping.resolve_input", return_value=_mock_rss_resolved(episodes)),
+        patch("podcast_ctl.cli.commands.mapping.list_channel_videos", return_value=catalog),
+    ):
+        result2 = runner.invoke(app, ["mapping", "sync", "My Show", "--channel", "https://youtube.com/@show"])
+    assert result2.exit_code == 0
+    assert "Saved 0 episode mapping(s)" in result2.stdout
+    assert "2 episode(s) already had a mapping" in result2.stdout
+
+
+def test_mapping_sync_dry_run_saves_nothing() -> None:
+    episodes = [_sync_episode("ep-1", "Episode One: Python")]
+    catalog = [ChannelVideo(video_id="vid0000001a", title="Episode One: Python")]
+    with (
+        patch("podcast_ctl.cli.commands.mapping.resolve_input", return_value=_mock_rss_resolved(episodes)),
+        patch("podcast_ctl.cli.commands.mapping.list_channel_videos", return_value=catalog),
+    ):
+        result = runner.invoke(
+            app, ["mapping", "sync", "My Show", "--channel", "https://youtube.com/@show", "--dry-run"]
+        )
+    assert result.exit_code == 0
+    assert "Would save 1 episode mapping(s)" in result.stdout
+    assert StorageRepository().get_episode_mapping("My Show", "ep-1") is None
+
+
+def test_mapping_sync_uses_stored_show_mapping_channel() -> None:
+    repo = StorageRepository()
+    repo.save_show_mapping(
+        ShowMapping(
+            feed_url="https://feed.com/rss",
+            show_title="My Show",
+            youtube_channel_url="https://youtube.com/@stored",
+        )
+    )
+    episodes = [_sync_episode("ep-1", "Episode One: Python")]
+    with (
+        patch("podcast_ctl.cli.commands.mapping.resolve_input", return_value=_mock_rss_resolved(episodes)),
+        patch("podcast_ctl.cli.commands.mapping.list_channel_videos", return_value=[]) as list_mock,
+    ):
+        result = runner.invoke(app, ["mapping", "sync", "My Show"])
+    assert list_mock.call_args.args[0] == "https://youtube.com/@stored"
+    assert result.exit_code == 1  # empty catalog is an error, but resolution used the stored channel
+    assert "No videos found" in result.stderr
+
+
+def test_mapping_sync_without_channel_errors() -> None:
+    episodes = [_sync_episode("ep-1", "Episode One: Python")]
+    with patch("podcast_ctl.cli.commands.mapping.resolve_input", return_value=_mock_rss_resolved(episodes)):
+        result = runner.invoke(app, ["mapping", "sync", "My Show"])
+    assert result.exit_code == 1
+    assert "No YouTube channel known" in result.stderr
+
+
+def test_mapping_sync_rejects_bad_threshold() -> None:
+    result = runner.invoke(app, ["mapping", "sync", "My Show", "--threshold", "1.5"])
+    assert result.exit_code == 2
+    assert "--threshold must be in (0, 1]" in result.stderr
+
+
+# =============================================================================
+# Persistent log file tests
+# =============================================================================
+
+
+def test_log_file_is_created_next_to_the_database(tmp_path: Path) -> None:
+    """Every run keeps a persistent INFO log next to the SQLite catalog."""
+    # NOTE: --help exits eagerly before the app callback configures logging,
+    # so a real subcommand is needed to exercise the log setup.
+    result = runner.invoke(app, ["mapping", "list"])
+    assert result.exit_code == 0
+    log_file = tmp_path / "logs" / "podcast-ctl.log"
+    assert log_file.exists()
+
+
+def test_log_file_flag_overrides_location(tmp_path: Path) -> None:
+    custom = tmp_path / "custom" / "run.log"
+    result = runner.invoke(app, ["--log-file", str(custom), "mapping", "list"])
+    assert result.exit_code == 0
+    assert custom.exists()
