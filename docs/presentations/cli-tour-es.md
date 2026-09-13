@@ -311,6 +311,9 @@ Sources muestra cuál rankeó cada resultado. Prueba la misma consulta con
 - Los vectores son blobs en el mismo `kb.sqlite` — coseno **exacto** en proceso, sin servicio de BD vectorial
 - Adaptador de nube opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
 - Cambia de modelo o proveedor → `podcast-ctl kb embed --reindex`
+- `kb embed` muestra una barra de progreso real y el dispositivo en uso; `--device cpu|mps|cuda` fuerza uno
+- `kb search` auto-detecta el proveedor registrado en la base — sin flag `--provider`
+- Alternativa local rápida: Ollama vía el adaptador OpenAI-compatible (~3 min vs ~3 h para ~3.500 fragmentos en Apple Silicon)
 
 <!--
 Guion: ¿de dónde salen los vectores? De un modelo local, bge-m3, bueno en
