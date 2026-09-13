@@ -244,6 +244,21 @@ def test_embed_kb_incremental_after_episode_rebuild() -> None:
     assert store.stats()["embeddings"] == store.stats()["chunks"]
 
 
+def test_embed_kb_reports_progress_per_batch() -> None:
+    builder = seed_kb()
+    store = builder.store
+    total = store.stats()["chunks"]
+
+    calls: list[tuple[int, int]] = []
+    report = embed_kb(store, StubProvider(), batch_size=2, progress=lambda done, n: calls.append((done, n)))
+
+    assert calls[0] == (0, total)
+    assert calls[-1] == (total, total)
+    # One call per batch plus the initial zero call.
+    assert len(calls) == len(report.batch_sizes) + 1
+    assert all(n == total for _, n in calls)
+
+
 def test_embed_kb_scoped_to_show() -> None:
     builder = seed_kb()
     store = builder.store

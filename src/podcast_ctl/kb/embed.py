@@ -9,6 +9,7 @@ silently mixing incompatible vectors.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from podcast_ctl.kb.embeddings import EmbeddingIdentityMismatch, EmbeddingProvider, normalize_vector
@@ -35,6 +36,7 @@ def embed_kb(
     show_id: str | None = None,
     reindex: bool = False,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    progress: Callable[[int, int], None] | None = None,
 ) -> EmbedReport:
     """Embed every indexed chunk that lacks a vector for the current provider.
 
@@ -42,6 +44,9 @@ def embed_kb(
     refuses to mix them: pass ``reindex=True`` to drop the old vectors and
     rebuild from scratch (a reproducible reindex, since raw snapshots and
     chunks are unchanged).
+
+    ``progress`` is an optional ``(done, total)`` callback invoked once per
+    batch so callers can render a real progress bar.
     """
     report = EmbedReport(provider_identity=provider.identity())
 
@@ -61,6 +66,8 @@ def embed_kb(
     scoped_total = store.count_chunks(show_id=show_id)
     report.already_indexed = 0 if report.reindexed else scoped_total - len(missing)
 
+    if progress is not None:
+        progress(0, len(missing))
     for offset in range(0, len(missing), batch_size):
         batch = missing[offset : offset + batch_size]
         texts = [str(row["text"]) for row in batch]
@@ -80,5 +87,7 @@ def embed_kb(
         store.upsert_embeddings(rows, identity=provider.identity())
         report.embedded += len(rows)
         report.batch_sizes.append(len(rows))
+        if progress is not None:
+            progress(report.embedded, len(missing))
 
     return report
