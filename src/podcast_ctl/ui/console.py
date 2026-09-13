@@ -198,6 +198,40 @@ class UIConsole:
         return tbl
 
     @contextmanager
+    def task_progress(self, description: str) -> Generator[Any, None, None]:
+        """Context manager yielding an ``update(done, total)`` callback for a progress bar.
+
+        The bar shows a spinner, a determinate bar, completed/total counts, and
+        elapsed time; it disappears once the block exits (transient).
+        """
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[cyan]{task.description}"),
+            BarColumn(bar_width=None),
+            MofNCompleteColumn(),
+            TextColumn("[dim]elapsed[/dim]"),
+            TimeElapsedColumn(),
+            console=self.stdout_console,
+            transient=True,
+        )
+        task_id = progress.add_task(description, total=None)
+
+        def update(done: int, total: int) -> None:
+            progress.update(task_id, completed=done, total=max(total, 1))
+
+        with progress:
+            yield update
+
+    @contextmanager
     def status_spinner(
         self,
         status: str = "Processing...",
@@ -233,6 +267,7 @@ error = console.error
 panel = console.panel
 table = console.table
 status_spinner = console.status_spinner
+task_progress = console.task_progress
 print = console.print
 print_error = console.print_error
 rule = console.rule

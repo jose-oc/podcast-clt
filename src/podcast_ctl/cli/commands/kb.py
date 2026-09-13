@@ -143,9 +143,9 @@ def kb_embed(
     backend = _load_provider(provider, model)
     console.print(f"[bold cyan]Embedding provider:[/bold cyan] {backend.identity()}")
 
-    with console.status_spinner("Embedding chunks..."):
+    with console.task_progress("Embedding chunks") as update:
         try:
-            report = embed_kb(store, backend, show_id=show, reindex=reindex, batch_size=batch_size)
+            report = embed_kb(store, backend, show_id=show, reindex=reindex, batch_size=batch_size, progress=update)
         except EmbeddingIdentityMismatch as exc:
             console.error(str(exc))
             raise typer.Exit(code=1) from exc
