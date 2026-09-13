@@ -18,6 +18,7 @@ from podcast_ctl.gatekeeper import (
 )
 from podcast_ctl.models import (
     EpisodeMetadata,
+    ShowMapping,
     TranscriptResult,
     TranscriptSegment,
 )
@@ -282,6 +283,32 @@ class TestPreFlightInspector:
 
         assert summary.tier_breakdown["youtube"] == 1
         assert summary.episode_tiers["ch-1"] == "youtube"
+
+    def test_youtube_channel_mapping_matched_by_feed_title(
+        self, memory_repo: StorageRepository
+    ) -> None:
+        ep = EpisodeMetadata(
+            show_title="Huberman Lab",
+            episode_title="Ep 1",
+            episode_id="hub-1",
+            audio_url="https://audio.example.com/hub1.mp3",
+            duration_seconds=600.0,
+            rss_transcripts=[],
+            source_type="rss",
+        )
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.megaphone.fm/hubermanlab",
+                show_title="Huberman Lab",
+                youtube_channel_url="https://www.youtube.com/@hubermanlab",
+            )
+        )
+
+        inspector = PreFlightInspector(repository=memory_repo)
+        summary = inspector.inspect_episodes_sync([ep], preferred_engine="auto")
+
+        assert summary.tier_breakdown["youtube"] == 1
+        assert summary.episode_tiers["hub-1"] == "youtube"
 
     def test_engine_override_cloud(
         self, memory_repo: StorageRepository, sample_episodes: list[EpisodeMetadata]

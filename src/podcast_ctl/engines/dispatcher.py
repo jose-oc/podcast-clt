@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -11,10 +12,12 @@ from podcast_ctl.engines.base import (
     TranscriptionEngineError,
     TranscriptNotFoundError,
 )
+from podcast_ctl.engines.channel_search import search_channel_for_episode
 from podcast_ctl.engines.cloud_engine import CloudTranscriptionEngine
 from podcast_ctl.engines.rss_engine import RSSTranscriptionEngine
 from podcast_ctl.engines.whisper_engine import WhisperTranscriptionEngine
-from podcast_ctl.engines.youtube_engine import YouTubeTranscriptionEngine
+from podcast_ctl.engines.youtube_engine import YouTubeTranscriptionEngine, extract_youtube_video_id
+from podcast_ctl.models.knowledge import EpisodeMapping
 from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult
 from podcast_ctl.storage.repository import StorageRepository
 
@@ -107,6 +110,54 @@ class TranscriptionDispatcher:
                 mapped_youtube_url = ep_mapping.youtube_video_url
 
         execution_chain = self.resolve_execution_chain(engine_target)
+
+        # 2b. Fallback: Show -> YouTube Channel mapping. Search the channel's
+        # recent videos for a title that closely matches the episode title.
+        channel_search_note: str | None = None
+        if (
+            mapped_youtube_url is None
+            and "youtube" in execution_chain
+            and self.storage_repo
+            and not extract_youtube_video_id(episode.episode_id)
+            and not extract_youtube_video_id(episode.audio_url)
+        ):
+            show_mapping = self.storage_repo.find_show_mapping(show_id)
+            if show_mapping and show_mapping.youtube_channel_url:
+                channel_url = show_mapping.youtube_channel_url
+                try:
+                    search = await asyncio.to_thread(
+                        search_channel_for_episode,
+                        channel_url,
+                        episode.episode_title,
+                    )
+                except Exception as exc:
+                    logger.info(f"YouTube channel search failed for '{channel_url}': {exc}")
+                    channel_search_note = (
+                        f"[youtube] Show mapping points to channel {channel_url} but searching it failed: {exc}"
+                    )
+                else:
+                    if search.video_url:
+                        mapped_youtube_url = search.video_url
+                        logger.info(
+                            f"Resolved '{episode.episode_title}' via channel search: "
+                            f"'{search.matched_title}' (similarity {search.similarity:.2f})"
+                        )
+                        # Auto-learn the discovered mapping (unconfirmed)
+                        self.storage_repo.save_episode_mapping(
+                            EpisodeMapping(
+                                show_id=show_id,
+                                episode_id=episode_id,
+                                youtube_video_url=search.video_url,
+                                confirmed_by_user=False,
+                            )
+                        )
+                    else:
+                        channel_search_note = (
+                            f"[youtube] Show mapping points to channel {channel_url}, but none of its "
+                            f"{search.videos_searched} recent videos closely matches "
+                            f"'{episode.episode_title}' (best similarity {search.best_similarity:.0%}). "
+                            "Add an explicit mapping with 'podcast-ctl mapping add episode'."
+                        )
         attempt_errors: list[str] = []
 
         for eng_name in execution_chain:
@@ -140,6 +191,8 @@ class TranscriptionDispatcher:
             except (TranscriptNotFoundError, EngineUnavailableError) as exc:
                 logger.info(f"Engine '{eng_name}' skipped: {exc}")
                 attempt_errors.append(f"[{eng_name}] {exc}")
+                if eng_name == "youtube" and channel_search_note:
+                    attempt_errors.append(channel_search_note)
             except Exception as exc:
                 logger.warning(f"Engine '{eng_name}' failed with unexpected error: {exc}")
                 attempt_errors.append(f"[{eng_name}] Unexpected error: {exc}")

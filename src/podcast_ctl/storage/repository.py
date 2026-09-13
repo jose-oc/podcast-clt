@@ -313,6 +313,20 @@ class StorageRepository:
                 custom_settings=data.get("custom_settings", {}),
             )
 
+    def find_show_mapping(self, show_id: str) -> ShowMapping | None:
+        """Retrieve a ShowMapping by feed URL or, failing that, by show title.
+
+        Transcription-time show IDs are usually the feed title, while show
+        mappings are keyed by feed URL, so callers need this combined lookup.
+        """
+        mapping = self.get_show_mapping(show_id)
+        if mapping is not None:
+            return mapping
+        for candidate in self.list_show_mappings():
+            if candidate.show_title == show_id:
+                return candidate
+        return None
+
     def list_show_mappings(self) -> list[ShowMapping]:
         """List all saved ShowMappings."""
         with self.db.connection() as conn:

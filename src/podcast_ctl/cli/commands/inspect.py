@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import typer
+from rich.markup import escape
 from rich.table import Table
 
 from podcast_ctl.discovery.resolver import resolve_input
@@ -48,6 +49,15 @@ def inspect_command(
             help="Maximum number of individual episodes to show in detailed table",
         ),
     ] = 20,
+    guids: Annotated[
+        bool,
+        typer.Option(
+            "--guids",
+            "-g",
+            help="Also print a plain, copyable list of episode GUIDs and titles "
+            "(the GUID is what 'mapping add episode' expects)",
+        ),
+    ] = False,
 ) -> None:
     """Inspect a podcast feed, show, YouTube link, or audio file and display pre-flight analysis."""
     with console.status_spinner(f"Resolving input source '[bold white]{input_source}[/bold white]'..."):
@@ -125,6 +135,7 @@ def inspect_command(
     )
     ep_table.add_column("#", style="bold cyan", justify="right", width=4)
     ep_table.add_column("Episode Title", style="bold white", min_width=30)
+    ep_table.add_column("Episode GUID", style="dim", min_width=20)
     ep_table.add_column("Duration", style="dim", justify="center", width=12)
     ep_table.add_column("Target Tier", justify="center", width=16)
     ep_table.add_column("Published Date", style="dim", width=18)
@@ -142,6 +153,14 @@ def inspect_command(
         styled_tier = tier_styles.get(target_tier, target_tier.upper())
         dur_str = _format_seconds(ep.duration_seconds)
         pub_date = ep.published_date[:10] if ep.published_date else "-"
-        ep_table.add_row(str(idx), ep.episode_title, dur_str, styled_tier, pub_date)
+        ep_table.add_row(str(idx), ep.episode_title, ep.episode_id, dur_str, styled_tier, pub_date)
 
     console.print(ep_table)
+
+    if guids:
+        console.print(
+            "\n[bold cyan]Episode GUIDs[/bold cyan] "
+            "[dim](use these with 'podcast-ctl mapping add episode'):[/dim]"
+        )
+        for ep in resolved.episodes[:limit]:
+            console.print(f"{escape(ep.episode_id)}  [dim]{escape(ep.episode_title)}[/dim]")

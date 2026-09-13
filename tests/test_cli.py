@@ -473,6 +473,12 @@ def test_mapping_lifecycle() -> None:
     assert res_list.exit_code == 0
     assert "No YouTube mappings found" in res_list.stdout
 
+    # Feed resolution is unreachable here: mappings must be saved exactly as provided
+    mapping_resolve = patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        side_effect=ConnectionError("no network in tests"),
+    )
+
     # 2. Add show mapping
     res_add_show = runner.invoke(
         app,
@@ -490,17 +496,18 @@ def test_mapping_lifecycle() -> None:
     assert "Saved show mapping" in res_add_show.stdout
 
     # 3. Add episode mapping
-    res_add_ep = runner.invoke(
-        app,
-        [
-            "mapping",
-            "add",
-            "episode",
-            "My Show",
-            "ep-101",
-            "https://youtube.com/watch?v=abc123xyz",
-        ],
-    )
+    with mapping_resolve:
+        res_add_ep = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "episode",
+                "My Show",
+                "ep-101",
+                "https://youtube.com/watch?v=abc123xyz",
+            ],
+        )
     assert res_add_ep.exit_code == 0
     assert "Saved episode mapping" in res_add_ep.stdout
 
@@ -521,6 +528,149 @@ def test_mapping_lifecycle() -> None:
     res_rm_show = runner.invoke(app, ["mapping", "remove", "show", "https://feed.com/rss"])
     assert res_rm_show.exit_code == 0
     assert "Removed show mapping" in res_rm_show.stdout
+
+
+def _mock_rss_resolved(episodes: list[EpisodeMetadata]) -> ResolvedSource:
+    return ResolvedSource(
+        source_type="rss",
+        query="https://feed.com/rss",
+        show_metadata=ShowMetadata(title="My Show", feed_url="https://feed.com/rss"),
+        episodes=episodes,
+    )
+
+
+def test_mapping_add_show_resolves_feed_title() -> None:
+    """Without --title, the show title is resolved from the feed itself."""
+    with patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        return_value=_mock_rss_resolved([]),
+    ):
+        res = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "show",
+                "https://feed.com/rss",
+                "https://youtube.com/@show",
+            ],
+        )
+    assert res.exit_code == 0
+    assert "Resolved show title from the feed" in res.stdout
+    assert "My Show" in res.stdout
+
+    res_list = runner.invoke(app, ["mapping", "list"])
+    assert "My Show" in res_list.stdout
+
+
+def test_mapping_add_show_offline_warns_and_keeps_feed_url() -> None:
+    """If the feed cannot be fetched, the mapping is still saved with a warning."""
+    with patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        side_effect=ConnectionError("no network in tests"),
+    ):
+        res = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "show",
+                "https://feed.com/rss",
+                "https://youtube.com/@show",
+            ],
+        )
+    assert res.exit_code == 0
+    assert "Could not fetch the feed" in res.stdout
+    assert "Saved show mapping" in res.stdout
+
+
+def test_mapping_add_episode_resolves_exact_title_to_guid() -> None:
+    """An exact episode title is resolved to its RSS GUID via the feed."""
+    ep = EpisodeMetadata(
+        show_title="My Show",
+        episode_title="Episode 101: The Title",
+        episode_id="guid-101",
+        audio_url="https://feed.com/ep101.mp3",
+        source_type="rss",
+    )
+    with patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        return_value=_mock_rss_resolved([ep]),
+    ):
+        res = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "episode",
+                "My Show",
+                "Episode 101: The Title",
+                "https://youtube.com/watch?v=abc123xyz",
+            ],
+        )
+    assert res.exit_code == 0
+    assert "Resolved episode title to GUID" in res.stdout
+    assert "guid-101" in res.stdout
+
+    res_list = runner.invoke(app, ["mapping", "list"])
+    assert "guid-101" in res_list.stdout
+
+
+def test_mapping_add_episode_guid_passthrough_when_in_feed() -> None:
+    """A value that already is an RSS GUID is kept unchanged."""
+    ep = EpisodeMetadata(
+        show_title="My Show",
+        episode_title="Episode 101: The Title",
+        episode_id="guid-101",
+        audio_url="https://feed.com/ep101.mp3",
+        source_type="rss",
+    )
+    with patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        return_value=_mock_rss_resolved([ep]),
+    ):
+        res = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "episode",
+                "My Show",
+                "guid-101",
+                "https://youtube.com/watch?v=abc123xyz",
+            ],
+        )
+    assert res.exit_code == 0
+    assert "Resolved episode title to GUID" not in res.stdout
+    assert "guid-101" in res.stdout
+
+
+def test_mapping_add_episode_unknown_title_fails_with_hint() -> None:
+    """An unknown title/GUID aborts with a hint towards inspect."""
+    ep = EpisodeMetadata(
+        show_title="My Show",
+        episode_title="Episode 101: The Title",
+        episode_id="guid-101",
+        audio_url="https://feed.com/ep101.mp3",
+        source_type="rss",
+    )
+    with patch(
+        "podcast_ctl.cli.commands.mapping.resolve_input",
+        return_value=_mock_rss_resolved([ep]),
+    ):
+        res = runner.invoke(
+            app,
+            [
+                "mapping",
+                "add",
+                "episode",
+                "My Show",
+                "No Such Episode",
+                "https://youtube.com/watch?v=abc123xyz",
+            ],
+        )
+    assert res.exit_code == 1
+    assert "No episode with GUID or exact title" in (res.stdout or res.output)
 
 
 # =============================================================================
