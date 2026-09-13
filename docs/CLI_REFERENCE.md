@@ -288,6 +288,8 @@ podcast-ctl kb embed [--provider local|openai-compatible] [--model <name>] [--sh
   `PODCAST_CTL_EMBED_MODEL`.
 * `--reindex` is required when switching providers/models: stored vectors
   from an incompatible model are dropped and rebuilt, never mixed.
+* `--device auto|cpu|mps|cuda` (or `PODCAST_CTL_EMBED_DEVICE`) selects the
+  torch device for the local backend; the device in use is printed.
 
 #### `kb search`
 Search the chunk index. Default mode is `auto`: hybrid retrieval (RRF k=60
@@ -296,6 +298,10 @@ that. Lexical matching is diacritics-insensitive (AND first, OR fallback).
 ```bash
 podcast-ctl kb search <query> [--limit <N>] [--show <show_id>] [--mode auto|lexical|vector|hybrid] [--provider <name>] [--model <name>] [--json] [--context] [--kb-dir <path>]
 ```
+* `--provider` is auto-detected by default: vector/hybrid searches use the
+  provider identity recorded in the index by `kb embed`, so switching
+  machines or shells never silently queries with the wrong model. Pass it
+  explicitly to override (a mismatch with the index is refused).
 * `--json`: machine-readable chunks for scripting (adds `mode`, `sources`,
   `bm25`, `cosine` fields for vector/hybrid results).
 * `--context`: full chunks as Markdown blocks, ready to paste into an LLM.

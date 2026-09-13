@@ -229,6 +229,17 @@ class OpenAICompatibleProvider:
         return vectors
 
 
+def parse_embedding_identity(identity: str) -> tuple[str, str]:
+    """Split a stored identity (``provider:model@version``) into ``(provider, model)``.
+
+    Returns empty strings for the parts it cannot parse; callers decide how
+    to handle an identity they do not recognize.
+    """
+    provider, _, rest = identity.partition(":")
+    model, _, _version = rest.rpartition("@")
+    return provider, model
+
+
 def get_embedding_provider(
     name: str = PROVIDER_LOCAL,
     model: str | None = None,

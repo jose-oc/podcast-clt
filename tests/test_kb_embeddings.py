@@ -417,15 +417,64 @@ def test_cli_search_identity_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda name="local", model=None, device=None: StubProvider(model="other-model"),
     )
 
-    # Auto degrades to lexical with a warning.
-    result = runner.invoke(app, ["kb", "search", "stew"])
+    # An explicitly requested provider that conflicts with the index is
+    # refused: auto mode degrades to lexical with a warning...
+    result = runner.invoke(app, ["kb", "search", "stew", "--provider", "local"])
     assert result.exit_code == 0, result.output
     assert "reindex" in result.output.lower()
 
-    # Explicit hybrid fails with the reindex hint.
-    result = runner.invoke(app, ["kb", "search", "stew", "--mode", "hybrid"])
+    # ...and an explicit mode plus provider fails with the reindex hint.
+    result = runner.invoke(app, ["kb", "search", "stew", "--mode", "hybrid", "--provider", "local"])
     assert result.exit_code == 1
     assert "reindex" in result.output.lower()
+
+
+def test_cli_search_auto_detects_provider_from_index(monkeypatch: pytest.MonkeyPatch) -> None:
+    builder = seed_kb()
+    embed_kb(builder.store, StubProvider(model="stub-model"))
+
+    calls: list[tuple[str, str | None]] = []
+
+    def recording(name: str = "local", model: str | None = None, device: str | None = None) -> StubProvider:
+        calls.append((name, model))
+        return StubProvider(model="stub-model")
+
+    monkeypatch.setattr("podcast_ctl.cli.commands.kb.get_embedding_provider", recording)
+
+    # No --provider: the identity recorded in the index drives the choice.
+    result = runner.invoke(app, ["kb", "search", "stew", "--mode", "vector"])
+    assert result.exit_code == 0, result.output
+    assert calls == [("stub", "stub-model")]
+
+    # An explicit --provider always wins over the recorded identity.
+    calls.clear()
+    result = runner.invoke(app, ["kb", "search", "stew", "--mode", "vector", "--provider", "stub"])
+    assert result.exit_code == 0, result.output
+    assert calls == [("stub", None)]
+
+
+def test_cli_search_auto_detects_openai_compatible_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression test for the real incident: searching a KB built with
+    --provider openai-compatible must not fall back to the local backend
+    (which used to read PODCAST_CTL_EMBED_MODEL as a Hugging Face repo)."""
+    builder = seed_kb()
+    provider = StubProvider(model="bge-m3")
+    provider_identity = "openai-compatible:bge-m3@adapter-v1"
+    embed_kb(builder.store, provider)
+    # Simulate an index built by the openai-compatible adapter.
+    builder.store.set_meta("embedding_identity", provider_identity)
+
+    calls: list[tuple[str, str | None]] = []
+
+    def recording(name: str = "local", model: str | None = None, device: str | None = None) -> StubProvider:
+        calls.append((name, model))
+        return StubProvider(model="bge-m3")
+
+    monkeypatch.setattr("podcast_ctl.cli.commands.kb.get_embedding_provider", recording)
+
+    result = runner.invoke(app, ["kb", "search", "stew", "--mode", "vector"])
+    assert result.exit_code == 0, result.output
+    assert calls == [("openai-compatible", "bge-m3")]
 
 
 def test_cli_embed_requires_matching_provider(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -105,6 +105,10 @@ Provider independence is enforced, not aspirational:
   `kb embed --reindex` drops the old vectors and rebuilds from the unchanged
   raw snapshots and chunks — a reproducible reindex. (`kb search --mode auto`
   degrades to lexical with a warning instead of failing.)
+- **Self-describing index.** `kb search` needs no `--provider` flag: it
+  reads the identity recorded in the index and queries with the same
+  provider and model that built the vectors. The flag exists only to
+  override, and a conflicting override is refused.
 - **Portable storage.** Vectors live as float32 BLOBs in `kb.sqlite` and are
   compared with an in-process cosine over unit-normalized vectors — no
   native SQLite extension to load, so the index file stays portable across
