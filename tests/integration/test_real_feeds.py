@@ -29,7 +29,7 @@ import pytest
 
 from podcast_ctl.discovery.itunes import PodcastSearchResult, search_itunes
 from podcast_ctl.discovery.rss import EpisodeMetadata, fetch_and_parse_feed
-from podcast_ctl.engines.base import TranscriptNotFoundError
+from podcast_ctl.engines.base import EngineRateLimitedError, TranscriptNotFoundError
 from podcast_ctl.engines.rss_engine import RSSTranscriptionEngine
 from podcast_ctl.engines.youtube_engine import YouTubeTranscriptionEngine
 
@@ -209,6 +209,8 @@ class TestMonosEstocasticos:
         )
         try:
             result = await engine.transcribe(episode)
+        except EngineRateLimitedError as exc:
+            pytest.skip(f"YouTube is rate-limiting this IP (expected on CI runners): {exc}")
         except TranscriptNotFoundError as exc:
             _skip_if_youtube_blocked(exc)
             pytest.fail(f"Captions unexpectedly unavailable for video {video_id}: {exc}")

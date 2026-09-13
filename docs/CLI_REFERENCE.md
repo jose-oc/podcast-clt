@@ -120,6 +120,9 @@ podcast-ctl transcribe <input_source> [OPTIONS]
 * `--yes`, `-y` *(bool, default: False)*: Auto-confirm pre-flight inspection and guardrail prompts.
 * `--force` *(bool, default: False)*: Force re-transcription bypassing SQLite cache.
 * `--keep-audio` *(bool, default: False)*: Preserve downloaded audio files in the cache.
+* `--youtube-delay` *(float, default: 2.0)*: Base seconds to wait between YouTube subtitle requests, randomized +/-50% (so 2.0 waits 1-3s). Set to `0` to disable pacing.
+
+**YouTube rate limiting.** YouTube throttles IPs that fetch many captions in a row (HTTP 429 / IP-blocked errors), so the `youtube` engine paces itself with `--youtube-delay` and, on the first 429, is disabled for the rest of the batch instead of being retried episode by episode (which is what prolongs the block). The remaining episodes fall back to the other engines (e.g. local whisper), the batch summary reports the disabled engine, and re-running later resumes where it stopped because completed episodes are cached. Disablements and pacing waits are recorded in the [log file](#logging).
 
 #### Examples
 ```bash

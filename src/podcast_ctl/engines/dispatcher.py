@@ -8,6 +8,7 @@ from typing import Any
 
 from podcast_ctl.engines.base import (
     BaseTranscriptionEngine,
+    EngineRateLimitedError,
     EngineUnavailableError,
     TranscriptionEngineError,
     TranscriptNotFoundError,
@@ -62,9 +63,20 @@ class TranscriptionDispatcher:
         self._channel_catalog_cache: dict[str, list[ChannelVideo] | None] = {}
         self._channel_catalog_errors: dict[str, Exception] = {}
 
+        # Engines disabled mid-batch after upstream rate limiting (name ->
+        # reason). Retrying a throttled backend episode by episode is what
+        # prolongs the block, so the first 429/IpBlocked benches the engine
+        # for the rest of the run.
+        self._disabled_engines: dict[str, str] = {}
+
     def register_engine(self, name: str, engine: BaseTranscriptionEngine) -> None:
         """Register or replace a transcription engine by name."""
         self.engines[name.lower()] = engine
+
+    @property
+    def disabled_engines(self) -> dict[str, str]:
+        """Engines disabled mid-batch (name -> reason), e.g. after upstream rate limiting."""
+        return dict(self._disabled_engines)
 
     def get_engine(self, name: str) -> BaseTranscriptionEngine:
         """Retrieve an engine instance by name."""
@@ -185,6 +197,12 @@ class TranscriptionDispatcher:
         attempt_errors: list[str] = []
 
         for eng_name in execution_chain:
+            if eng_name in self._disabled_engines:
+                attempt_errors.append(
+                    f"[{eng_name}] Skipped: {self._disabled_engines[eng_name]} (disabled earlier in this batch)"
+                )
+                continue
+
             try:
                 eng = self.get_engine(eng_name)
             except Exception as exc:
@@ -213,6 +231,13 @@ class TranscriptionDispatcher:
                 logger.info(f"Successfully transcribed '{episode.episode_title}' with tier '{result.tier_used}'.")
                 return result
 
+            except EngineRateLimitedError as exc:
+                logger.warning(f"Engine '{eng_name}' disabled for the rest of this batch: {exc}")
+                self._disabled_engines[eng_name] = str(exc)
+                attempt_errors.append(
+                    f"[{eng_name}] {exc} Disabled for the rest of this batch - retry in a few hours; "
+                    "cached transcripts are kept, so re-running later resumes where it stopped."
+                )
             except (TranscriptNotFoundError, EngineUnavailableError) as exc:
                 logger.info(f"Engine '{eng_name}' skipped: {exc}")
                 attempt_errors.append(f"[{eng_name}] {exc}")
