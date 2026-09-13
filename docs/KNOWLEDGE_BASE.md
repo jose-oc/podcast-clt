@@ -88,6 +88,37 @@ export PODCAST_CTL_EMBED_MODEL="text-embedding-x"
 podcast-ctl kb embed --provider openai-compatible --reindex
 ```
 
+### Worked example: Ollama on the same machine
+
+Neither Ollama nor any specific model is required — any OpenAI-compatible
+endpoint works — but a local [Ollama](https://ollama.com) server is the
+easiest self-hosted option, and keeps everything on your machine:
+
+```bash
+# 1. Pull an embedding model (bge-m3 is the same model the local provider
+#    uses, so results stay comparable between the two)
+ollama pull bge-m3
+
+# 2. Point the provider at Ollama's OpenAI-compatible endpoint
+ollama serve   # if it is not already running
+export PODCAST_CTL_EMBED_BASE_URL=http://localhost:11434/v1
+export PODCAST_CTL_EMBED_API_KEY=ollama   # any non-empty value; Ollama ignores it
+export PODCAST_CTL_EMBED_MODEL=bge-m3
+
+# 3. Reindex with the new provider (required when switching, so vectors
+#    from different pipelines never mix)
+podcast-ctl kb embed --provider openai-compatible --reindex
+
+# 4. Search as usual — no --provider flag needed, the index remembers
+#    which provider built its vectors
+podcast-ctl kb search "your question here"
+```
+
+As a rough benchmark from real use on an Apple Silicon Mac: embedding a
+~3,500-chunk KB took ~3 minutes through Ollama (Metal GPU) versus ~3 hours
+with the in-process local provider while the system was under memory
+pressure.
+
 Provider independence is enforced, not aspirational:
 
 - **Local by default.** The default backend is sentence-transformers with
