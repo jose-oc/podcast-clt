@@ -112,6 +112,36 @@ Provider independence is enforced, not aspirational:
   (e.g. sqlite-vec) later would be a pure performance change that reuses the
   same stored vectors.
 
+## Local backend: device selection and memory footprint
+
+The local backend runs on the fastest device sentence-transformers can find
+(CUDA, then Apple Silicon MPS, then CPU). `kb embed` prints the device in
+use, and you can force one:
+
+```bash
+podcast-ctl kb embed --device cpu   # also: mps, cuda; default is auto
+# or export PODCAST_CTL_EMBED_DEVICE=cpu
+```
+
+**Observed memory footprint (macOS, Apple Silicon).** A full embed run of a
+~3,500-chunk KB with `BAAI/bge-m3` on MPS was seen to hold ~18.5 GB of RAM.
+The model itself is ~2.3 GB in fp32, so the rest is PyTorch framework
+overhead plus the MPS allocator, which reserves memory aggressively and does
+not return it to the OS while the process runs — Activity Monitor counts
+that reservation. Two practical consequences:
+
+- On a memory-constrained Mac the run can push the system into swap, which
+  slows embedding down by an order of magnitude. If that happens, try
+  `--device cpu` (slower per batch but a much smaller footprint) or a
+  smaller `--batch-size`.
+- The `openai-compatible` provider with a local server (e.g. Ollama on the
+  same machine, see below) moves the model's memory out of the CLI process
+  entirely and lets the server's native GPU stack handle it — in practice
+  this is dramatically faster on Apple Silicon.
+
+The peak is a reservation, not a leak: it does not grow across runs and is
+released when the process exits.
+
 ## End-to-end example: podcast → transcript → KB → LLM answer
 
 ### 1. Transcribe episodes (populates the cache)
