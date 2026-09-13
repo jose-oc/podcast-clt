@@ -29,7 +29,10 @@ from podcast_ctl.engines import (
     parse_vtt_content,
 )
 from podcast_ctl.engines.channel_search import (
-    ChannelSearchResult,
+    DEFAULT_MAX_VIDEOS,
+    ChannelVideo,
+    list_channel_videos,
+    match_episode_to_videos,
     normalize_title,
     search_channel_for_episode,
     title_similarity,
@@ -849,6 +852,48 @@ class TestChannelSearch:
         assert result.video_url is None
         assert result.videos_searched == 0
 
+    def test_list_channel_videos_returns_id_and_title(self) -> None:
+        entries = [
+            {"id": "abc123def45", "title": "First video"},
+            {"id": "xyz987uvw65", "title": "Second video"},
+            {"id": "no-title-00", "title": None},
+            {"id": None, "title": "No id"},
+        ]
+        with patch("podcast_ctl.engines.channel_search.yt_dlp.YoutubeDL", self._mock_yt_dlp(entries)) as mock_cls:
+            videos = list_channel_videos("https://www.youtube.com/@hubermanlab")
+        assert videos == [
+            ChannelVideo(video_id="abc123def45", title="First video"),
+            ChannelVideo(video_id="xyz987uvw65", title="Second video"),
+        ]
+        # No max_videos: the whole catalog is requested (no playlistend cap)
+        ydl_opts = mock_cls.call_args.args[0]
+        assert "playlistend" not in ydl_opts
+
+    def test_list_channel_videos_caps_with_max_videos(self) -> None:
+        with patch("podcast_ctl.engines.channel_search.yt_dlp.YoutubeDL", self._mock_yt_dlp([])) as mock_cls:
+            list_channel_videos("https://www.youtube.com/@hubermanlab", max_videos=25)
+        ydl_opts = mock_cls.call_args.args[0]
+        assert ydl_opts["playlistend"] == 25
+
+    def test_match_episode_to_videos_accepts_close_title(self) -> None:
+        videos = [
+            ChannelVideo(video_id="xyz123abc00", title="Completely unrelated video"),
+            ChannelVideo(video_id="N5AQFYtqx8Q", title="Using AI to Increase Your Intelligence | Dr. Fei-Fei Li"),
+        ]
+        result = match_episode_to_videos("Using AI to Increase Your Intelligence | Dr. Fei-Fei Li", videos)
+        assert result.video_url == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
+        assert result.similarity == 1.0
+        assert result.videos_searched == 2
+
+    def test_match_episode_to_videos_rejects_below_threshold(self) -> None:
+        videos = [ChannelVideo(video_id="xyz123abc00", title="Completely unrelated video")]
+        result = match_episode_to_videos("Some episode title", videos)
+        assert result.video_url is None
+        assert 0.0 < result.best_similarity < 0.75
+
+    def test_channel_video_url(self) -> None:
+        assert ChannelVideo(video_id="N5AQFYtqx8Q", title="t").url == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
+
 
 class TestDispatcherChannelFallback:
     @pytest.mark.asyncio
@@ -878,25 +923,16 @@ class TestDispatcherChannelFallback:
             engines={"youtube": mock_youtube},
         )
 
-        fake_search = ChannelSearchResult(
-            video_url="https://www.youtube.com/watch?v=N5AQFYtqx8Q",
-            matched_title="Episode 500: Rust for JS Devs",
-            similarity=1.0,
-            videos_searched=10,
-            best_similarity=1.0,
-        )
         with patch(
-            "podcast_ctl.engines.dispatcher.search_channel_for_episode",
-            return_value=fake_search,
-        ) as search_mock:
+            "podcast_ctl.engines.dispatcher.list_channel_videos",
+            return_value=[ChannelVideo(video_id="N5AQFYtqx8Q", title="Episode 500: Rust for JS Devs")],
+        ) as list_mock:
             result = await dispatcher.transcribe(sample_episode, engine="youtube")
 
         assert result.tier_used == "youtube"
         _, kwargs = mock_youtube.transcribe.call_args
         assert kwargs["youtube_url"] == "https://www.youtube.com/watch?v=N5AQFYtqx8Q"
-        search_mock.assert_called_once_with(
-            "https://www.youtube.com/@syntaxfm", "Episode 500: Rust for JS Devs"
-        )
+        list_mock.assert_called_once_with("https://www.youtube.com/@syntaxfm", DEFAULT_MAX_VIDEOS)
 
         # The discovered mapping is auto-learned as unconfirmed
         learned = memory_repo.get_episode_mapping("syntax", "syntax-500")
@@ -927,10 +963,10 @@ class TestDispatcherChannelFallback:
             engines={"youtube": mock_youtube},
         )
 
-        fake_search = ChannelSearchResult(videos_searched=7, best_similarity=0.42)
+        unrelated = [ChannelVideo(video_id=f"vid{i:08d}", title=f"Unrelated video {i}") for i in range(7)]
         with patch(
-            "podcast_ctl.engines.dispatcher.search_channel_for_episode",
-            return_value=fake_search,
+            "podcast_ctl.engines.dispatcher.list_channel_videos",
+            return_value=unrelated,
         ):
             with pytest.raises(TranscriptionEngineError) as exc_info:
                 await dispatcher.transcribe(sample_episode, engine="youtube")
@@ -938,6 +974,7 @@ class TestDispatcherChannelFallback:
         message = str(exc_info.value)
         assert "none of its 7 recent videos" in message
         assert "mapping add episode" in message
+        assert "mapping sync" in message
 
     @pytest.mark.asyncio
     async def test_episode_mapping_takes_precedence_over_channel_search(
@@ -974,12 +1011,97 @@ class TestDispatcherChannelFallback:
         )
 
         with patch(
-            "podcast_ctl.engines.dispatcher.search_channel_for_episode"
-        ) as search_mock:
+            "podcast_ctl.engines.dispatcher.list_channel_videos"
+        ) as list_mock:
             result = await dispatcher.transcribe(sample_episode, engine="youtube")
 
         assert result.tier_used == "youtube"
         _, kwargs = mock_youtube.transcribe.call_args
         assert kwargs["youtube_url"] == "https://www.youtube.com/watch?v=explicit01"
-        search_mock.assert_not_called()
+        list_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_channel_listing_is_cached_across_episodes(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        """A batch of episodes lists each mapped channel only once per dispatcher."""
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.example.com/syntax",
+                show_title="syntax",
+                youtube_channel_url="https://www.youtube.com/@syntaxfm",
+            )
+        )
+        second_episode = sample_episode.model_copy(
+            update={"episode_id": "syntax-501", "episode_title": "Episode 501: CSS Wizardry"}
+        )
+
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            return_value=TranscriptResult(
+                metadata=sample_episode,
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="YouTube captions")],
+                tier_used="youtube",
+            )
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+
+        catalog = [
+            ChannelVideo(video_id="vid500abc01", title="Episode 500: Rust for JS Devs"),
+            ChannelVideo(video_id="vid501def02", title="Episode 501: CSS Wizardry"),
+        ]
+        with patch(
+            "podcast_ctl.engines.dispatcher.list_channel_videos",
+            return_value=catalog,
+        ) as list_mock:
+            await dispatcher.transcribe(sample_episode, engine="youtube")
+            await dispatcher.transcribe(second_episode, engine="youtube")
+
+        list_mock.assert_called_once_with("https://www.youtube.com/@syntaxfm", DEFAULT_MAX_VIDEOS)
+        calls = mock_youtube.transcribe.call_args_list
+        assert calls[0].kwargs["youtube_url"] == "https://www.youtube.com/watch?v=vid500abc01"
+        assert calls[1].kwargs["youtube_url"] == "https://www.youtube.com/watch?v=vid501def02"
+
+    @pytest.mark.asyncio
+    async def test_failed_channel_listing_is_not_retried_per_episode(
+        self, memory_repo: StorageRepository, sample_episode: EpisodeMetadata
+    ) -> None:
+        """A listing failure (e.g. throttling) is cached so a batch does not hammer the channel."""
+        memory_repo.save_show_mapping(
+            ShowMapping(
+                feed_url="https://feeds.example.com/syntax",
+                show_title="syntax",
+                youtube_channel_url="https://www.youtube.com/@syntaxfm",
+            )
+        )
+        second_episode = sample_episode.model_copy(
+            update={"episode_id": "syntax-501", "episode_title": "Episode 501: CSS Wizardry"}
+        )
+
+        mock_youtube = MagicMock(spec=YouTubeTranscriptionEngine)
+        mock_youtube.is_available.return_value = True
+        mock_youtube.transcribe = AsyncMock(
+            side_effect=TranscriptNotFoundError("No YouTube video ID could be resolved")
+        )
+
+        dispatcher = TranscriptionDispatcher(
+            storage_repo=memory_repo,
+            engines={"youtube": mock_youtube},
+        )
+
+        with patch(
+            "podcast_ctl.engines.dispatcher.list_channel_videos",
+            side_effect=RuntimeError("HTTP 429 Too Many Requests"),
+        ) as list_mock:
+            for ep in (sample_episode, second_episode):
+                with pytest.raises(TranscriptionEngineError) as exc_info:
+                    await dispatcher.transcribe(ep, engine="youtube")
+                assert "listing its videos failed: HTTP 429 Too Many Requests" in str(exc_info.value)
+
+        list_mock.assert_called_once()
 

@@ -69,6 +69,12 @@ class YouTubeTranscriptionEngine(BaseTranscriptionEngine):
         except ImportError:
             return False
 
+    def unavailable_reason(self) -> str | None:
+        """Explain that the YouTube subtitle dependencies are missing."""
+        if self.is_available():
+            return None
+        return "neither youtube-transcript-api nor yt-dlp is installed"
+
     def resolve_video_id(self, episode: EpisodeMetadata, kwargs: dict[str, Any]) -> str | None:
         """Find the YouTube video ID from kwargs or episode metadata."""
         # 1. Explicit in kwargs

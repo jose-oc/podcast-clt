@@ -13,7 +13,8 @@ podcast-ctl [OPTIONS] COMMAND [ARGS]...
 | Flag | Short | Description |
 | :--- | :--- | :--- |
 | `--version` | `-v` | Display `podcast-ctl` version and exit. |
-| `--verbose` | | Enable verbose debug logging output. |
+| `--verbose` | | Enable verbose debug logging output on the console. |
+| `--log-file` | | Custom log file path (see [Logging](#logging)). |
 | `--help` | | Show help message and exit. |
 
 ---
@@ -164,6 +165,8 @@ Manage learned Show $\leftrightarrow$ YouTube Channel and Episode $\leftrightarr
 podcast-ctl mapping COMMAND [OPTIONS]
 ```
 
+`COMMAND` is what to manage: `list`, `add show|episode`, `remove show|episode`, or `sync`. The `add`/`remove` group help (`podcast-ctl mapping add --help`) shows copyable examples.
+
 #### Subcommands
 
 #### `mapping list`
@@ -182,6 +185,8 @@ Without `--title`, the show title is resolved from the feed itself (needs networ
 
 When a show has a channel mapping, transcription with the `youtube` engine (directly or via `auto`) works even without per-episode mappings: if no episode mapping matches, the channel's recent videos (up to 60) are searched for a title closely matching the episode title. Titles are normalized (lowercase, punctuation stripped) and compared by similarity ratio; a match is accepted at 0.75 or higher. Accepted matches are stored as auto-discovered (unconfirmed) episode mappings, so each episode is only searched once. If nothing matches, the error message reports how many videos were searched and the best similarity found.
 
+The channel listing is cached for the duration of a batch run, so transcribing N episodes lists each channel only once (and a failed listing is not retried per episode). The fallback only sees the 60 most recent channel videos: for older episodes use `mapping sync` (below) or an explicit `mapping add episode`.
+
 #### `mapping add episode`
 Associate a specific podcast episode with a direct YouTube video URL.
 ```bash
@@ -192,6 +197,20 @@ podcast-ctl mapping add episode <show_id> <episode_id_or_title> <youtube_video_u
 * `<episode_id_or_title>`: the episode's **RSS GUID** or its exact title. A title is resolved to its GUID by fetching the feed (needs network); the transcription-time lookup is always `show title + GUID`, so a mapping stored under a raw title never matches.
 
 Find an episode's GUID with `podcast-ctl inspect <show> --guids` (or the Episode GUID column in the inspect table, truncated in narrow terminals). If the feed cannot be fetched, the value is stored as provided with a warning, so explicit GUID mappings still work offline.
+
+#### `mapping sync`
+Match every episode of a show against its YouTube channel in one pass.
+```bash
+podcast-ctl mapping sync <show> [--channel <url>] [--threshold <0-1>] [--max-videos <n>] [--dry-run]
+```
+
+* `<show>`: the show title as in the RSS feed, an iTunes search term, or the RSS feed URL.
+* `--channel`: YouTube channel URL. Defaults to the channel of the stored show mapping (`mapping add show`).
+* `--threshold`: minimum normalized title similarity to accept a match (default: 0.75).
+* `--max-videos`: search only the N most recent channel videos (default: the full channel catalog).
+* `--dry-run`: report the matches without saving anything.
+
+The feed and the channel catalog are each listed once and all titles are compared locally, so large back catalogs do not cost one request per episode. Accepted matches are stored as auto-discovered (unconfirmed) episode mappings; episodes that already have a mapping are left untouched. This is the way to make a whole back catalog transcribable with the `youtube` engine: the per-episode fallback during transcription only searches the 60 most recent channel videos.
 
 #### `mapping remove show`
 Delete a Show $\leftrightarrow$ YouTube Channel mapping.
@@ -285,6 +304,16 @@ podcast-ctl kb status [--kb-dir <path>]
 ```
 
 ---
+
+---
+
+## Logging
+
+Every run appends INFO-level diagnostics (engine attempts, cache hits, channel searches, failures) to a rotating log file, so batch runs can be diagnosed afterwards:
+
+* Default path: `~/.local/share/podcast-ctl/logs/podcast-ctl.log` (next to the SQLite catalog; honors `PODCAST_CTL_DB_PATH`).
+* Rotation: 1 MB per file, 3 backups kept.
+* Override the location with `--log-file <path>`; add `--verbose` to also see DEBUG output on the console.
 
 ---
 

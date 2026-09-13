@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from rich.console import Console, RenderableType
+from rich.markup import escape
 from rich.panel import Panel
 from rich.status import Status
 from rich.table import Table
@@ -112,11 +113,11 @@ class UIConsole:
         if isinstance(message, str):
             msg_body = f"[bold red]{message}[/bold red]"
             if exception is not None:
-                exc_detail = f"\n[dim red]{type(exception).__name__}: {exception}[/dim red]"
+                exc_detail = f"\n[dim red]{type(exception).__name__}: {escape(str(exception))}[/dim red]"
                 msg_body += exc_detail
             err_text = msg_body
         elif isinstance(message, Exception):
-            err_text = f"[bold red]{type(message).__name__}: {message}[/bold red]"
+            err_text = f"[bold red]{type(message).__name__}: {escape(str(message))}[/bold red]"
         else:
             err_text = message
 
