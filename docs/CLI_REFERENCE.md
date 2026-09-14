@@ -14,6 +14,7 @@ podcast-ctl [OPTIONS] COMMAND [ARGS]...
 |:-------------|:------|:----------------------------------------------------|
 | `--version`  | `-v`  | Display `podcast-ctl` version and exit.             |
 | `--verbose`  |       | Enable verbose debug logging output on the console. |
+| `--debug`   |       | Print full Python tracebacks on errors.             |
 | `--log-file` |       | Custom log file path (see [Logging](#logging)).     |
 | `--help`     |       | Show help message and exit.                         |
 
@@ -326,12 +327,24 @@ Every run appends INFO-level diagnostics (engine attempts, cache hits, channel s
 
 ---
 
+## Error Messages
+
+Expected failures (bad paths, missing databases, unreachable providers, invalid configuration) print a
+short message saying what failed and how to fix it, and exit with code 1 - no Python traceback. Unexpected
+errors print a one-line summary and write the full traceback to the log file (see [Logging](#logging)).
+
+Pass `--debug` (or set `PODCAST_CTL_DEBUG=1`) to print the full traceback for unexpected errors when
+troubleshooting. Expected errors keep their short message either way; their tracebacks are in the log file.
+
+---
+
 ## Environment Variables
 
 | Variable                     | Description                                                       | Default                                     |
 |:-----------------------------|:------------------------------------------------------------------|:--------------------------------------------|
 | `PODCAST_CTL_DB_PATH`        | Custom path to SQLite database file.                              | `~/.local/share/podcast-ctl/podcast_ctl.db` |
 | `PODCAST_CTL_KB_DIR`         | Custom path to the knowledge base directory.                      | `kb/` next to the catalog DB                |
+| `PODCAST_CTL_DEBUG`          | Print full Python tracebacks on errors (same as `--debug`).        | unset (friendly error messages)             |
 | `PODCAST_CTL_EMBED_MODEL`    | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3`                               |
 | `PODCAST_CTL_EMBED_DEVICE`   | Device for the local embedding backend (auto, cpu, mps, cuda).    | `auto`                                      |
 | `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API.                  | None                                        |

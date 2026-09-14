@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
+from typer.exceptions import Abort
 
 from podcast_ctl import __version__
 from podcast_ctl.cli.commands.cache import cache_app
@@ -16,6 +19,7 @@ from podcast_ctl.cli.commands.kb import kb_app
 from podcast_ctl.cli.commands.mapping import mapping_app
 from podcast_ctl.cli.commands.search import search_command
 from podcast_ctl.cli.commands.transcribe import transcribe_command
+from podcast_ctl.errors import PodcastCtlError, debug_enabled, set_debug
 from podcast_ctl.storage.db import get_default_db_path
 from podcast_ctl.ui.console import console
 
@@ -119,6 +123,12 @@ def main(
         "--verbose",
         help="Enable verbose debug logging output on the console.",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Print full Python tracebacks on errors instead of a short message.",
+        envvar="PODCAST_CTL_DEBUG",
+    ),
     log_file: Annotated[
         Path | None,
         typer.Option(
@@ -128,8 +138,82 @@ def main(
     ] = None,
 ) -> None:
     """Fast, modular CLI to discover, inspect, and transcribe podcast episodes and YouTube shows."""
+    set_debug(debug)
     _configure_logging(verbose=verbose, log_file=log_file)
 
 
+def _describe_unexpected(exc: Exception) -> str:
+    """One-line, plain-language description of a common unexpected failure."""
+    if isinstance(exc, httpx.ConnectError):
+        host = exc.request.url.host if exc.request is not None else "the remote service"
+        return f"could not connect to {host}. Check your network connection and that the service is running."
+    if isinstance(exc, httpx.TimeoutException):
+        return "the request timed out. The service may be slow or unreachable; try again."
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"the service at {exc.request.url.host} returned HTTP {exc.response.status_code}."
+    if isinstance(exc, sqlite3.OperationalError):
+        return f"SQLite error: {exc}. If the database path is custom, check PODCAST_CTL_DB_PATH."
+    if isinstance(exc, PermissionError):
+        return f"permission denied: {exc.filename or exc}. Check that the path is writable."
+    if isinstance(exc, FileNotFoundError):
+        return f"file not found: {exc.filename or exc}."
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _log_traceback_to_file(exc: BaseException) -> Path | None:
+    """Record the full traceback on the file log handler only, keeping it off the console.
+
+    Returns the log file path so the user can be pointed at it, or None when
+    no file handler is configured (e.g. the log directory is not writable).
+    """
+    logger = logging.getLogger("podcast_ctl")
+    record = logger.makeRecord(
+        logger.name,
+        logging.ERROR,
+        __file__,
+        0,
+        f"Unhandled error: {exc!r}",
+        (),
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    log_path: Path | None = None
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, logging.FileHandler):
+            handler.handle(record)
+            if log_path is None:
+                log_path = Path(handler.baseFilename)
+    return log_path
+
+
+def run() -> None:
+    """Console-script entry point: run the Typer app behind the CLI error boundary.
+
+    Expected, user-facing errors (:class:`PodcastCtlError`) print a short,
+    actionable message and exit 1. Unexpected errors print a one-line summary,
+    write the full traceback to the log file, and exit 1. ``--debug`` or
+    ``PODCAST_CTL_DEBUG=1`` re-raises unexpected errors with the full
+    traceback for troubleshooting.
+    """
+    try:
+        app()
+    except (SystemExit, typer.Exit, Abort):
+        raise
+    except PodcastCtlError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc.message}")
+        if exc.hint:
+            console.print(f"[dim]Hint: {exc.hint}[/dim]")
+        _log_traceback_to_file(exc)
+        raise SystemExit(1) from None
+    except Exception as exc:
+        if debug_enabled():
+            raise
+        console.print(f"[bold red]Unexpected error:[/bold red] {_describe_unexpected(exc)}")
+        log_path = _log_traceback_to_file(exc)
+        if log_path is not None:
+            console.print(f"[dim]The full traceback was written to the log file: {log_path}[/dim]")
+        console.print("[dim]Rerun with --debug (or PODCAST_CTL_DEBUG=1) to print the traceback.[/dim]")
+        raise SystemExit(1) from None
+
+
 if __name__ == "__main__":
-    app()
+    run()
