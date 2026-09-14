@@ -32,7 +32,12 @@ def _format_size(size_bytes: int) -> str:
 
 @cache_app.command("stats")
 def cache_stats() -> None:
-    """Display SQLite database statistics, entity counts, and disk usage."""
+    """Display SQLite database statistics, entity counts, and disk usage.
+
+    \b
+    Examples:
+      podcast-ctl cache stats
+    """
     repo = StorageRepository()
     stats = repo.get_cache_stats()
 
@@ -75,7 +80,13 @@ def cache_list(
         ),
     ] = 25,
 ) -> None:
-    """List transcripts currently stored in the local SQLite cache."""
+    """List transcripts currently stored in the local SQLite cache.
+
+    \b
+    Examples:
+      podcast-ctl cache list
+      podcast-ctl cache list --show "Huberman Lab" --limit 10
+    """
     repo = StorageRepository()
     transcripts = repo.list_transcripts(show_id=show)
 
@@ -140,7 +151,13 @@ def cache_clean(
         ),
     ] = False,
 ) -> None:
-    """Clear cached transcripts from the local SQLite database."""
+    """Clear cached transcripts from the local SQLite database.
+
+    \b
+    Examples:
+      podcast-ctl cache clean --show "Huberman Lab"
+      podcast-ctl cache clean --yes   # everything, no confirmation prompt
+    """
     target_desc = f"all cached transcripts for show '{show}'" if show else "ALL cached transcripts"
 
     if not yes and sys.stdin.isatty():

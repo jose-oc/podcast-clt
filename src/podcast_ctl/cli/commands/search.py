@@ -24,7 +24,13 @@ def search_command(
         ),
     ] = True,
 ) -> None:
-    """Search Apple Podcasts / iTunes directory for shows and feeds."""
+    """Search Apple Podcasts / iTunes directory for shows and feeds.
+
+    \b
+    Examples:
+      podcast-ctl search "Huberman Lab"
+      podcast-ctl search "marketing online" --limit 5 --no-interactive
+    """
     with console.status_spinner(f"Searching Apple Podcasts for '[bold white]{query}[/bold white]'..."):
         results = search_itunes(query, limit=limit)
 

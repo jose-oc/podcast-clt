@@ -84,6 +84,11 @@ def kb_build(
 
     Derives per-episode Markdown, the INDEX.md catalog, and the FTS5 chunk
     index. Unchanged episodes are skipped, so it is safe to run repeatedly.
+
+    \b
+    Examples:
+      podcast-ctl kb build
+      podcast-ctl kb build --show "Huberman Lab"
     """
     builder = KbBuilder(kb_dir=kb_dir)
     report = builder.build(show_id=show)
@@ -151,6 +156,12 @@ def kb_embed(
     processed. Every vector records the provider identity (backend, model,
     version, dimensions); switching providers requires --reindex so vectors
     from incompatible models never mix.
+
+    \b
+    Examples:
+      podcast-ctl kb embed
+      podcast-ctl kb embed --device cpu
+      podcast-ctl kb embed --provider openai-compatible --reindex
     """
     store = _open_store(kb_dir)
     if store.count_chunks(show_id=show) == 0:
@@ -295,7 +306,14 @@ def kb_search(
         typer.Option("--kb-dir", help="Override the knowledge base directory."),
     ] = None,
 ) -> None:
-    """Search the knowledge base and print chunks with [Episode @ mm:ss] citations."""
+    """Search the knowledge base and print chunks with [Episode @ mm:ss] citations.
+
+    \b
+    Examples:
+      podcast-ctl kb search "how to improve deep sleep"
+      podcast-ctl kb search "creatine" --mode lexical --limit 5
+      podcast-ctl kb search "dopamine" --show "Huberman Lab" --context
+    """
     if mode not in ("auto", MODE_LEXICAL, MODE_VECTOR, MODE_HYBRID):
         console.error(f"Unknown mode '{mode}'. Available: auto, {MODE_LEXICAL}, {MODE_VECTOR}, {MODE_HYBRID}.")
         raise typer.Exit(code=1)
@@ -364,7 +382,12 @@ def kb_status(
         typer.Option("--kb-dir", help="Override the knowledge base directory."),
     ] = None,
 ) -> None:
-    """Show knowledge base location, size, and index statistics."""
+    """Show knowledge base location, size, and index statistics.
+
+    \b
+    Examples:
+      podcast-ctl kb status
+    """
     root = kb_dir or get_default_kb_dir()
     db_path = kb_db_path(root)
 

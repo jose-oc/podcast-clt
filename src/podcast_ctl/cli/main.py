@@ -32,20 +32,11 @@ app = typer.Typer(
 )
 
 # Register standalone commands
-app.command(
-    "search",
-    help="Search Apple Podcasts / iTunes directory for shows and RSS feeds.",
-)(search_command)
+app.command("search")(search_command)
 
-app.command(
-    "inspect",
-    help="Inspect a podcast feed, video, or audio file and display pre-flight analysis.",
-)(inspect_command)
+app.command("inspect")(inspect_command)
 
-app.command(
-    "transcribe",
-    help="Transcribe podcast episodes, YouTube videos, or local audio files.",
-)(transcribe_command)
+app.command("transcribe")(transcribe_command)
 
 # Register command sub-applications
 app.add_typer(
@@ -150,13 +141,25 @@ def _describe_unexpected(exc: Exception) -> str:
     if isinstance(exc, httpx.TimeoutException):
         return "the request timed out. The service may be slow or unreachable; try again."
     if isinstance(exc, httpx.HTTPStatusError):
-        return f"the service at {exc.request.url.host} returned HTTP {exc.response.status_code}."
+        host = exc.request.url.host
+        status = exc.response.status_code
+        if status in (401, 403):
+            return (
+                f"the service at {host} rejected the request (HTTP {status}). "
+                "Check the API key (for example PODCAST_CTL_EMBED_API_KEY) and that it is still valid."
+            )
+        if status == 404:
+            return (
+                f"the service at {host} returned HTTP 404. "
+                "Check the base URL (for example PODCAST_CTL_EMBED_BASE_URL) and the model name."
+            )
+        return f"the service at {host} returned HTTP {status}. Try again later, or check the service status."
     if isinstance(exc, sqlite3.OperationalError):
         return f"SQLite error: {exc}. If the database path is custom, check PODCAST_CTL_DB_PATH."
     if isinstance(exc, PermissionError):
         return f"permission denied: {exc.filename or exc}. Check that the path is writable."
     if isinstance(exc, FileNotFoundError):
-        return f"file not found: {exc.filename or exc}."
+        return f"file not found: {exc.filename or exc}. Check that the path exists and is typed correctly."
     return f"{type(exc).__name__}: {exc}"
 
 

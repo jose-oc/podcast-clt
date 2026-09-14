@@ -304,25 +304,42 @@ def transcribe_command(
         ),
     ] = 2.0,
 ) -> None:
-    """Transcribe podcast episodes, YouTube videos, or local audio files with multi-tier fallback."""
+    """Transcribe podcast episodes, YouTube videos, or local audio files with multi-tier fallback.
+
+    \b
+    Examples:
+      podcast-ctl transcribe "Huberman Lab" --latest
+      podcast-ctl transcribe "Huberman Lab" --match "sleep" --yes
+      podcast-ctl transcribe https://youtu.be/<video_id>
+      podcast-ctl transcribe ./episode.mp3 --engine whisper --model-size small
+    """
     # 1. Resolve input source
     with console.status_spinner(f"Resolving input source '[bold white]{input_source}[/bold white]'..."):
         resolved = resolve_input(input_source)
 
     if resolved.source_type == "search":
         if not resolved.search_results:
-            console.error(f"No podcast found matching query: '{input_source}'")
+            console.error(
+                f"No podcast found matching query: '{input_source}'. "
+                "Try a different search term, or pass the RSS feed or video URL directly."
+            )
             raise typer.Exit(code=1)
         top_match = resolved.search_results[0]
         if not top_match.feed_url:
-            console.error(f"Podcast '{top_match.title}' does not have an RSS feed URL.")
+            console.error(
+                f"Podcast '{top_match.title}' does not have an RSS feed URL. "
+                "Pick another result from 'podcast-ctl search', or pass a feed/video URL directly."
+            )
             raise typer.Exit(code=1)
         console.info(f"Resolved search query to '[bold white]{top_match.title}[/bold white]'.")
         with console.status_spinner(f"Fetching RSS feed for '{top_match.title}'..."):
             resolved = resolve_input(top_match.feed_url)
 
     if not resolved.episodes:
-        console.error(f"No episodes found for source: '{input_source}'")
+        console.error(
+                f"No episodes found for source: '{input_source}'. "
+                "Check that the feed lists episodes and is reachable, or try a specific episode URL."
+            )
         raise typer.Exit(code=1)
 
     # 2. Select / filter episodes

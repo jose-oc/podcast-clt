@@ -59,7 +59,15 @@ def inspect_command(
         ),
     ] = False,
 ) -> None:
-    """Inspect a podcast feed, show, YouTube link, or audio file and display pre-flight analysis."""
+    """Inspect a podcast feed, show, YouTube link, or audio file and display pre-flight analysis.
+
+    \b
+    Examples:
+      podcast-ctl inspect "Huberman Lab"
+      podcast-ctl inspect "Huberman Lab" --guids   # list episode GUIDs
+      podcast-ctl inspect https://youtu.be/<video_id>
+      podcast-ctl inspect ./episode.mp3 --engine whisper
+    """
     with console.status_spinner(f"Resolving input source '[bold white]{input_source}[/bold white]'..."):
         resolved = resolve_input(input_source)
 
