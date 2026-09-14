@@ -91,7 +91,7 @@ o pasar a cualquier LLM.
   <div class="arrow">→</div>
   <div class="step"><b>Base de conocimiento</b>Markdown + búsqueda híbrida</div>
   <div class="arrow">→</div>
-  <div class="step"><b>Pregunta</b>Cualquier LLM — local o en la nube</div>
+  <div class="step"><b>Pregunta</b>Cualquier LLM — local o en cloud</div>
 </div>
 
 Como entrada vale un **feed RSS**, el **título del programa**, un **enlace de YouTube** o un **archivo de audio local**.
@@ -108,7 +108,7 @@ uv run podcast-ctl --help
 
 - Gestionado con **uv** — sin configurar entornos a mano
 - Nivel Whisper local opcional: `uv sync --extra whisper`
-- Los niveles en la nube usan `GROQ_API_KEY` / `OPENAI_API_KEY`
+- Los niveles en cloud usan `GROQ_API_KEY` / `OPENAI_API_KEY`
 
 ---
 
@@ -189,7 +189,7 @@ podcast-ctl transcribe "Marketing Online" --pick
 <div class="tier t1"><b>Nivel 1 · Transcripciones del RSS</b> — etiquetas oficiales de Podcasting 2.0. Instantáneo y gratis.</div>
 <div class="tier t2"><b>Nivel 2 · Subtítulos de YouTube</b> — gracias a las relaciones programa ↔ canal aprendidas. Instantáneo y gratis.</div>
 <div class="tier t3"><b>Nivel 3 · Whisper local</b> — faster-whisper en tu GPU/CPU. Privado y gratis.</div>
-<div class="tier t4"><b>Nivel 4 · APIs en la nube</b> — Whisper de Groq / OpenAI. Rápido, con guardarraíles de coste interactivos.</div>
+<div class="tier t4"><b>Nivel 4 · APIs en cloud</b> — Whisper de Groq / OpenAI. Rápido, con guardarraíles de coste interactivos.</div>
 
 **Gana la fuente más barata y privada — automáticamente.** Las transcripciones se guardan en SQLite, así que nunca pagas dos veces.
 
@@ -309,7 +309,7 @@ Sources muestra cuál rankeó cada resultado. Prueba la misma consulta con
 - **Privado y gratis**: sin coste por consulta, los transcripts no salen de tu máquina
 - Coste único: torch + descarga de **~2 GB** del modelo; ~4 KB por fragmento en disco
 - Los vectores son blobs en el mismo `kb.sqlite` — coseno **exacto** en proceso, sin servicio de BD vectorial
-- Adaptador de nube opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `PODCAST_CTL_OPENAI_MODEL`
+- Adaptador de cloud opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `PODCAST_CTL_OPENAI_MODEL`
 - Variables de modelo por proveedor: `PODCAST_CTL_LOCAL_MODEL` / `PODCAST_CTL_OPENAI_MODEL` tienen prioridad sobre la genérica `PODCAST_CTL_EMBED_MODEL`; `--model` manda — configura ambas una vez y cambia solo con `--provider`
 - Cambia de modelo o proveedor → `podcast-ctl kb embed --reindex`
 - `kb embed` muestra una barra de progreso real y el dispositivo en uso; `--device cpu|mps|cuda` fuerza uno
