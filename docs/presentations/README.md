@@ -15,6 +15,7 @@ features (e.g. embedding-based hybrid search), extend both decks together.
 ## Viewing and editing
 
 - **VS Code**: install the *Marp for VS Code* extension and open the preview.
+- **Mise**: if you use *mise* `mise use marp-cli@latest` to install marp.
 - **Anywhere**: `npx @marp-team/marp-cli docs/presentations/cli-tour-en.md`
   opens an HTML preview; add `-w` to watch for changes.
 
@@ -24,6 +25,8 @@ features (e.g. embedding-based hybrid search), extend both decks together.
 # PDF (one file per deck)
 npx @marp-team/marp-cli docs/presentations/cli-tour-en.md --pdf
 npx @marp-team/marp-cli docs/presentations/cli-tour-es.md --pdf
+# If using mise
+marp docs/presentations/cli-tour-en.md --pdf
 
 # PNG per slide (handy for video editing)
 npx @marp-team/marp-cli docs/presentations/cli-tour-en.md --images png
