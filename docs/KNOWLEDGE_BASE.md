@@ -329,5 +329,6 @@ model (requires `ollama serve` running and the model pulled).
 | `PODCAST_CTL_KB_DIR`         | Knowledge base root directory.                                                     | `kb/` next to the catalog DB, or `~/.local/share/podcast-ctl/kb` |
 | `PODCAST_CTL_DB_PATH`        | Catalog DB the KB reads transcripts from.                                          | `~/.local/share/podcast-ctl/podcast_ctl.db`                      |
 | `PODCAST_CTL_EMBED_MODEL`    | Embedding model for the local provider, or the model name the cloud adapter sends. | `BAAI/bge-m3`                                                    |
+| `PODCAST_CTL_EMBED_DEVICE`   | Device for the local embedding backend (`auto`, `cpu`, `mps`, `cuda`).             | `auto`                                                           |
 | `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API (cloud adapter).                   | —                                                                |
 | `PODCAST_CTL_EMBED_API_KEY`  | API key for the cloud adapter.                                                     | —                                                                |

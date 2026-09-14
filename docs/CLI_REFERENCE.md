@@ -333,6 +333,7 @@ Every run appends INFO-level diagnostics (engine attempts, cache hits, channel s
 | `PODCAST_CTL_DB_PATH`        | Custom path to SQLite database file.                              | `~/.local/share/podcast-ctl/podcast_ctl.db` |
 | `PODCAST_CTL_KB_DIR`         | Custom path to the knowledge base directory.                      | `kb/` next to the catalog DB                |
 | `PODCAST_CTL_EMBED_MODEL`    | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3`                               |
+| `PODCAST_CTL_EMBED_DEVICE`   | Device for the local embedding backend (auto, cpu, mps, cuda).    | `auto`                                      |
 | `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API.                  | None                                        |
 | `PODCAST_CTL_EMBED_API_KEY`  | API key for the KB cloud embedding adapter.                       | None                                        |
 | `GROQ_API_KEY`               | API key for Groq Cloud Whisper API.                               | None                                        |
