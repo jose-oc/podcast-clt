@@ -87,7 +87,7 @@ vendor is baked into the knowledge base:
 ```bash
 export PODCAST_CTL_EMBED_BASE_URL="https://api.example.com/v1"
 export PODCAST_CTL_EMBED_API_KEY="..."
-export PODCAST_CTL_EMBED_MODEL="text-embedding-x"
+export PODCAST_CTL_OPENAI_MODEL="text-embedding-x"
 podcast-ctl kb embed --provider openai-compatible --reindex
 ```
 

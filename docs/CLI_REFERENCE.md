@@ -286,11 +286,14 @@ podcast-ctl kb embed [--provider local|openai-compatible] [--model <name>] [--sh
   via the optional `podcast-ctl[embeddings]` extra.
 * `openai-compatible` is a thin cloud adapter configured through
   `PODCAST_CTL_EMBED_BASE_URL` / `PODCAST_CTL_EMBED_API_KEY` /
-  `PODCAST_CTL_EMBED_MODEL`.
+  `PODCAST_CTL_OPENAI_MODEL`.
 * `--reindex` is required when switching providers/models: stored vectors
   from an incompatible model are dropped and rebuilt, never mixed.
 * `--device auto|cpu|mps|cuda` (or `PODCAST_CTL_EMBED_DEVICE`) selects the
   torch device for the local backend; the device in use is printed.
+* Model selection per provider: `--model` > `PODCAST_CTL_LOCAL_MODEL` /
+  `PODCAST_CTL_OPENAI_MODEL` > `PODCAST_CTL_EMBED_MODEL` > built-in default.
+  Set both provider-specific variables once and switch with just `--provider`.
 
 #### `kb search`
 Search the chunk index. Default mode is `auto`: hybrid retrieval (RRF k=60
@@ -345,7 +348,9 @@ troubleshooting. Expected errors keep their short message either way; their trac
 | `PODCAST_CTL_DB_PATH`        | Custom path to SQLite database file.                              | `~/.local/share/podcast-ctl/podcast_ctl.db` |
 | `PODCAST_CTL_KB_DIR`         | Custom path to the knowledge base directory.                      | `kb/` next to the catalog DB                |
 | `PODCAST_CTL_DEBUG`          | Print full Python tracebacks on errors (same as `--debug`).        | unset (friendly error messages)             |
-| `PODCAST_CTL_EMBED_MODEL`    | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3`                               |
+| `PODCAST_CTL_LOCAL_MODEL`    | KB embedding model for the local provider (Hugging Face repo id). | `BAAI/bge-m3`                               |
+| `PODCAST_CTL_OPENAI_MODEL`   | KB embedding model name for the openai-compatible provider.       | None                                        |
+| `PODCAST_CTL_EMBED_MODEL`    | Generic KB embedding model fallback, used when the provider-specific variable is unset. | `BAAI/bge-m3` |
 | `PODCAST_CTL_EMBED_DEVICE`   | Device for the local embedding backend (auto, cpu, mps, cuda).    | `auto`                                      |
 | `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API.                  | None                                        |
 | `PODCAST_CTL_EMBED_API_KEY`  | API key for the KB cloud embedding adapter.                       | None                                        |

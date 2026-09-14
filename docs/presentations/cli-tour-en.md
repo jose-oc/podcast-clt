@@ -308,7 +308,8 @@ sells the feature.
 - **Private & free**: no per-query cost, transcripts never leave the machine
 - One-time cost: torch + **~2 GB** model download; ~4 KB per chunk on disk
 - Vectors are blobs in the same `kb.sqlite` — **exact** cosine in-process, no vector-DB service
-- Optional cloud adapter via env vars: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
+- Optional cloud adapter via env vars: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `PODCAST_CTL_OPENAI_MODEL`
+- Per-provider model vars: `PODCAST_CTL_LOCAL_MODEL` / `PODCAST_CTL_OPENAI_MODEL` override generic `PODCAST_CTL_EMBED_MODEL`; `--model` wins — set both once, switch with just `--provider`
 - Switch model or provider → `podcast-ctl kb embed --reindex`
 - `kb embed` shows a real progress bar and the device in use; `--device cpu|mps|cuda` overrides auto-detection
 - `kb search` auto-detects the provider recorded in the index — no `--provider` flag needed

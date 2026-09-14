@@ -22,7 +22,7 @@ import httpx
 
 # Default local embedding model: strong multilingual retrieval (including
 # Spanish), no per-query cost, transcripts never leave the machine. Override
-# with `kb embed --model` or PODCAST_CTL_EMBED_MODEL.
+# with `kb embed --model` or PODCAST_CTL_LOCAL_MODEL / PODCAST_CTL_EMBED_MODEL.
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
 
 # Available provider names for `--provider`.
@@ -35,6 +35,13 @@ PROVIDER_OPENAI_COMPATIBLE = "openai-compatible"
 ENV_EMBED_BASE_URL = "PODCAST_CTL_EMBED_BASE_URL"
 ENV_EMBED_API_KEY = "PODCAST_CTL_EMBED_API_KEY"
 ENV_EMBED_MODEL = "PODCAST_CTL_EMBED_MODEL"
+# Provider-specific model overrides. Each provider resolves its model as:
+# --model flag > its own variable below > PODCAST_CTL_EMBED_MODEL (generic)
+# > the built-in default. The openai-compatible variable is endpoint-agnostic:
+# it names the model at whatever OpenAI-compatible endpoint is configured
+# (Ollama, LM Studio, a hosted API - nothing here is tied to one vendor).
+ENV_LOCAL_MODEL = "PODCAST_CTL_LOCAL_MODEL"
+ENV_OPENAI_MODEL = "PODCAST_CTL_OPENAI_MODEL"
 # Optional device override for the local backend (cpu / mps / cuda). When
 # unset, sentence-transformers auto-selects the best available device.
 ENV_EMBED_DEVICE = "PODCAST_CTL_EMBED_DEVICE"
@@ -171,7 +178,7 @@ class OpenAICompatibleProvider:
 
     Configured entirely through environment variables
     (``PODCAST_CTL_EMBED_BASE_URL`` / ``PODCAST_CTL_EMBED_API_KEY`` /
-    ``PODCAST_CTL_EMBED_MODEL``), so the knowledge base stays decoupled from
+    ``PODCAST_CTL_OPENAI_MODEL``), so the knowledge base stays decoupled from
     any specific vendor: point it at OpenAI, a Gemini/OpenAI-compatible
     gateway, a self-hosted server, or any other compatible API.
     """
@@ -259,19 +266,22 @@ def get_embedding_provider(
     when the backend cannot be used.
     """
     if name == PROVIDER_LOCAL:
-        return SentenceTransformerProvider(
-            model or os.environ.get(ENV_EMBED_MODEL) or DEFAULT_EMBEDDING_MODEL, device=device
+        local_model = (
+            model or os.environ.get(ENV_LOCAL_MODEL) or os.environ.get(ENV_EMBED_MODEL)
         )
+        return SentenceTransformerProvider(local_model or DEFAULT_EMBEDDING_MODEL, device=device)
     if name == PROVIDER_OPENAI_COMPATIBLE:
         base_url = os.environ.get(ENV_EMBED_BASE_URL, "").strip()
         api_key = os.environ.get(ENV_EMBED_API_KEY, "").strip()
-        model_name = (model or os.environ.get(ENV_EMBED_MODEL) or "").strip()
+        model_name = (
+            model or os.environ.get(ENV_OPENAI_MODEL) or os.environ.get(ENV_EMBED_MODEL) or ""
+        ).strip()
         missing = [
             var
             for var, value in (
                 (ENV_EMBED_BASE_URL, base_url),
                 (ENV_EMBED_API_KEY, api_key),
-                (ENV_EMBED_MODEL, model_name),
+                (f"{ENV_OPENAI_MODEL} (or {ENV_EMBED_MODEL})", model_name),
             )
             if not value
         ]

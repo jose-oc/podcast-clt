@@ -1298,7 +1298,7 @@ def test_command_help_includes_examples(command: list[str]) -> None:
 
 def test_openai_compatible_provider_error_shows_setup_hint(monkeypatch: pytest.MonkeyPatch) -> None:
     """A missing cloud-adapter configuration error says how to fix it."""
-    for var in ("PODCAST_CTL_EMBED_BASE_URL", "PODCAST_CTL_EMBED_API_KEY", "PODCAST_CTL_EMBED_MODEL"):
+    for var in ("PODCAST_CTL_EMBED_BASE_URL", "PODCAST_CTL_EMBED_API_KEY", "PODCAST_CTL_EMBED_MODEL", "PODCAST_CTL_LOCAL_MODEL", "PODCAST_CTL_OPENAI_MODEL"):
         monkeypatch.delenv(var, raising=False)
     with pytest.raises(EmbeddingBackendUnavailable) as exc_info:
         get_embedding_provider("openai-compatible")

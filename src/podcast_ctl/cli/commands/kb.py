@@ -123,7 +123,7 @@ def kb_embed(
     ] = PROVIDER_LOCAL,
     model: Annotated[
         str | None,
-        typer.Option("--model", "-m", help="Embedding model name (defaults per provider)."),
+        typer.Option("--model", "-m", help="Embedding model name. Overrides PODCAST_CTL_LOCAL_MODEL / PODCAST_CTL_OPENAI_MODEL and the generic PODCAST_CTL_EMBED_MODEL."),
     ] = None,
     show: Annotated[
         str | None,
@@ -291,7 +291,7 @@ def kb_search(
     ] = None,
     model: Annotated[
         str | None,
-        typer.Option("--model", "-m", help="Embedding model name (defaults per provider)."),
+        typer.Option("--model", "-m", help="Embedding model name. Overrides PODCAST_CTL_LOCAL_MODEL / PODCAST_CTL_OPENAI_MODEL and the generic PODCAST_CTL_EMBED_MODEL."),
     ] = None,
     json_output: Annotated[
         bool,

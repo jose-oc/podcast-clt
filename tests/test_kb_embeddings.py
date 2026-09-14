@@ -18,6 +18,8 @@ from podcast_ctl.kb.embeddings import (
     ENV_EMBED_API_KEY,
     ENV_EMBED_BASE_URL,
     ENV_EMBED_MODEL,
+    ENV_LOCAL_MODEL,
+    ENV_OPENAI_MODEL,
     EmbeddingBackendUnavailable,
     EmbeddingIdentityMismatch,
     OpenAICompatibleProvider,
@@ -152,9 +154,16 @@ def test_factory_rejects_unknown_provider() -> None:
 
 
 def test_factory_openai_compatible_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in (ENV_EMBED_BASE_URL, ENV_EMBED_API_KEY, ENV_EMBED_MODEL):
+    for var in (ENV_EMBED_BASE_URL, ENV_EMBED_API_KEY, ENV_EMBED_MODEL, ENV_LOCAL_MODEL, ENV_OPENAI_MODEL):
         monkeypatch.delenv(var, raising=False)
     with pytest.raises(EmbeddingBackendUnavailable, match=ENV_EMBED_BASE_URL):
+        get_embedding_provider("openai-compatible")
+
+    # With the endpoint configured but no model anywhere, the error names
+    # the provider-specific variable (with the generic one as fallback).
+    monkeypatch.setenv(ENV_EMBED_BASE_URL, "https://api.example.com/v1")
+    monkeypatch.setenv(ENV_EMBED_API_KEY, "test-key")
+    with pytest.raises(EmbeddingBackendUnavailable, match=ENV_OPENAI_MODEL):
         get_embedding_provider("openai-compatible")
 
 
@@ -529,3 +538,69 @@ def test_cli_status_shows_embedding_identity() -> None:
     assert result.exit_code == 0, result.output
     assert "Embedded chunks" in result.output
     assert "stub:stub-model@v1" in result.output
+
+
+def test_factory_local_model_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--model > PODCAST_CTL_LOCAL_MODEL > PODCAST_CTL_EMBED_MODEL > default."""
+    import podcast_ctl.kb.embeddings as emb
+
+    for var in (ENV_EMBED_MODEL, ENV_LOCAL_MODEL, ENV_OPENAI_MODEL):
+        monkeypatch.delenv(var, raising=False)
+    chosen: list[str] = []
+    monkeypatch.setattr(emb, "SentenceTransformerProvider", lambda model, device=None: chosen.append(model))
+
+    get_embedding_provider("local")
+    assert chosen == ["BAAI/bge-m3"]  # built-in default
+
+    monkeypatch.setenv(ENV_EMBED_MODEL, "generic/model")
+    get_embedding_provider("local")
+    assert chosen[-1] == "generic/model"
+
+    monkeypatch.setenv(ENV_LOCAL_MODEL, "specific/model")
+    get_embedding_provider("local")
+    assert chosen[-1] == "specific/model"
+
+    get_embedding_provider("local", model="flag/model")
+    assert chosen[-1] == "flag/model"
+
+    # The other provider's variable never leaks into local resolution.
+    monkeypatch.delenv(ENV_LOCAL_MODEL)
+    monkeypatch.delenv(ENV_EMBED_MODEL)
+    monkeypatch.setenv(ENV_OPENAI_MODEL, "openai-model")
+    get_embedding_provider("local")
+    assert chosen[-1] == "BAAI/bge-m3"
+
+
+def test_factory_openai_compatible_model_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--model > PODCAST_CTL_OPENAI_MODEL > PODCAST_CTL_EMBED_MODEL."""
+    import podcast_ctl.kb.embeddings as emb
+
+    for var in (ENV_EMBED_MODEL, ENV_LOCAL_MODEL, ENV_OPENAI_MODEL):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv(ENV_EMBED_BASE_URL, "https://api.example.com/v1")
+    monkeypatch.setenv(ENV_EMBED_API_KEY, "test-key")
+    chosen: list[str] = []
+    monkeypatch.setattr(
+        emb,
+        "OpenAICompatibleProvider",
+        lambda base_url, api_key, model: chosen.append(model),
+    )
+
+    monkeypatch.setenv(ENV_EMBED_MODEL, "generic-model")
+    get_embedding_provider("openai-compatible")
+    assert chosen == ["generic-model"]
+
+    monkeypatch.setenv(ENV_OPENAI_MODEL, "specific-model")
+    get_embedding_provider("openai-compatible")
+    assert chosen[-1] == "specific-model"
+
+    get_embedding_provider("openai-compatible", model="flag-model")
+    assert chosen[-1] == "flag-model"
+
+    # The local provider's variable never satisfies the openai-compatible
+    # provider's model requirement.
+    monkeypatch.delenv(ENV_OPENAI_MODEL)
+    monkeypatch.delenv(ENV_EMBED_MODEL)
+    monkeypatch.setenv(ENV_LOCAL_MODEL, "BAAI/bge-m3")
+    with pytest.raises(EmbeddingBackendUnavailable, match=ENV_OPENAI_MODEL):
+        get_embedding_provider("openai-compatible")
