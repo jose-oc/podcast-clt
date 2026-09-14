@@ -309,7 +309,8 @@ Sources muestra cuál rankeó cada resultado. Prueba la misma consulta con
 - **Privado y gratis**: sin coste por consulta, los transcripts no salen de tu máquina
 - Coste único: torch + descarga de **~2 GB** del modelo; ~4 KB por fragmento en disco
 - Los vectores son blobs en el mismo `kb.sqlite` — coseno **exacto** en proceso, sin servicio de BD vectorial
-- Adaptador de nube opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL`
+- Adaptador de nube opcional por variables de entorno: `PODCAST_CTL_EMBED_BASE_URL` / `_API_KEY` / `PODCAST_CTL_OPENAI_MODEL`
+- Variables de modelo por proveedor: `PODCAST_CTL_LOCAL_MODEL` / `PODCAST_CTL_OPENAI_MODEL` tienen prioridad sobre la genérica `PODCAST_CTL_EMBED_MODEL`; `--model` manda — configura ambas una vez y cambia solo con `--provider`
 - Cambia de modelo o proveedor → `podcast-ctl kb embed --reindex`
 - `kb embed` muestra una barra de progreso real y el dispositivo en uso; `--device cpu|mps|cuda` fuerza uno
 - `kb search` auto-detecta el proveedor registrado en la base — sin flag `--provider`

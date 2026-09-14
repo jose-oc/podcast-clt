@@ -84,7 +84,7 @@ podcast-ctl kb embed --model intfloat/multilingual-e5-base --reindex
 # configured entirely through environment variables (no vendor coupling)
 export PODCAST_CTL_EMBED_BASE_URL="https://api.example.com/v1"
 export PODCAST_CTL_EMBED_API_KEY="..."
-export PODCAST_CTL_EMBED_MODEL="text-embedding-x"
+export PODCAST_CTL_OPENAI_MODEL="text-embedding-x"
 podcast-ctl kb embed --provider openai-compatible --reindex
 ```
 
@@ -103,7 +103,7 @@ ollama pull bge-m3
 ollama serve   # if it is not already running
 export PODCAST_CTL_EMBED_BASE_URL=http://localhost:11434/v1
 export PODCAST_CTL_EMBED_API_KEY=ollama   # any non-empty value; Ollama ignores it
-export PODCAST_CTL_EMBED_MODEL=bge-m3
+export PODCAST_CTL_OPENAI_MODEL=bge-m3
 
 # 3. Reindex with the new provider (required when switching, so vectors
 #    from different pipelines never mix)
@@ -118,6 +118,49 @@ As a rough benchmark from real use on an Apple Silicon Mac: embedding a
 ~3,500-chunk KB took ~3 minutes through Ollama (Metal GPU) versus ~3 hours
 with the in-process local provider while the system was under memory
 pressure.
+
+### Worked example: LM Studio
+
+[LM Studio](https://lmstudio.ai) speaks the same OpenAI-compatible protocol,
+so only the endpoint and the model name change — the provider itself knows
+nothing about either server:
+
+```bash
+# Serve a model from LM Studio (default port 1234), then:
+export PODCAST_CTL_EMBED_BASE_URL=http://localhost:1234/v1
+export PODCAST_CTL_EMBED_API_KEY=lm-studio   # any non-empty value
+export PODCAST_CTL_OPENAI_MODEL=bge-m3       # the model id LM Studio serves
+podcast-ctl kb embed --provider openai-compatible --reindex
+```
+
+Any other OpenAI-compatible endpoint (hosted or self-hosted) works the same
+way: set the three variables, pass `--provider openai-compatible`, reindex.
+
+### Choosing the model per provider
+
+Each provider resolves its model independently, with the same priority
+chain: the `--model` flag wins, then the provider-specific variable, then
+the generic `PODCAST_CTL_EMBED_MODEL`, then the built-in default
+(`BAAI/bge-m3`, local provider only).
+
+This means you can configure both providers once and switch between them by
+changing only `--provider` — no re-editing of the environment:
+
+```bash
+export PODCAST_CTL_LOCAL_MODEL=BAAI/bge-m3    # Hugging Face repo id
+export PODCAST_CTL_OPENAI_MODEL=bge-m3        # model id at the endpoint
+export PODCAST_CTL_EMBED_BASE_URL=http://localhost:11434/v1
+export PODCAST_CTL_EMBED_API_KEY=ollama
+
+podcast-ctl kb embed --provider local --reindex
+podcast-ctl kb embed --provider openai-compatible --reindex   # after a backup
+```
+
+Note the two variables hold different kinds of names: the local one is a
+Hugging Face repo id (`BAAI/bge-m3`), the openai-compatible one is whatever
+model id the configured endpoint serves (`bge-m3`). `PODCAST_CTL_EMBED_BASE_URL`
+and `PODCAST_CTL_EMBED_API_KEY` can stay set too — the local provider
+ignores them.
 
 Provider independence is enforced, not aspirational:
 
@@ -328,7 +371,9 @@ model (requires `ollama serve` running and the model pulled).
 |:-----------------------------|:-----------------------------------------------------------------------------------|:-----------------------------------------------------------------|
 | `PODCAST_CTL_KB_DIR`         | Knowledge base root directory.                                                     | `kb/` next to the catalog DB, or `~/.local/share/podcast-ctl/kb` |
 | `PODCAST_CTL_DB_PATH`        | Catalog DB the KB reads transcripts from.                                          | `~/.local/share/podcast-ctl/podcast_ctl.db`                      |
-| `PODCAST_CTL_EMBED_MODEL`    | Embedding model for the local provider, or the model name the cloud adapter sends. | `BAAI/bge-m3`                                                    |
+| `PODCAST_CTL_LOCAL_MODEL`    | Embedding model for the local provider (Hugging Face repo id).                     | `BAAI/bge-m3`                                                    |
+| `PODCAST_CTL_OPENAI_MODEL`   | Model name the openai-compatible provider sends to the configured endpoint.        | —                                                                |
+| `PODCAST_CTL_EMBED_MODEL`    | Generic fallback for either provider, used when its specific variable is unset.    | `BAAI/bge-m3`                                                    |
 | `PODCAST_CTL_EMBED_DEVICE`   | Device for the local embedding backend (`auto`, `cpu`, `mps`, `cuda`).             | `auto`                                                           |
 | `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API (cloud adapter).                   | —                                                                |
 | `PODCAST_CTL_EMBED_API_KEY`  | API key for the cloud adapter.                                                     | —                                                                |
