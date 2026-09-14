@@ -8,6 +8,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
+from podcast_ctl.errors import PodcastCtlError
+
 DEFAULT_DB_DIR = Path.home() / ".local" / "share" / "podcast-ctl"
 DEFAULT_DB_FILE = "podcast_ctl.db"
 
@@ -87,7 +89,13 @@ class Database:
 
         self._memory_conn: sqlite3.Connection | None = None
         if not self._is_memory and str(self.db_path) != ":memory:":
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise PodcastCtlError(
+                    f"Cannot create the data directory '{self.db_path.parent}': {exc.strerror or exc}.",
+                    hint="Check that PODCAST_CTL_DB_PATH points to a location you can write to.",
+                ) from exc
 
     @property
     def is_memory(self) -> bool:
@@ -102,7 +110,16 @@ class Database:
                 self._configure_connection(self._memory_conn)
             return self._memory_conn
 
-        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        try:
+            conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        except sqlite3.OperationalError as exc:
+            raise PodcastCtlError(
+                f"Cannot open the SQLite database at '{self.db_path}': {exc}.",
+                hint=(
+                    f"'{self.db_path}' must be a writable file path (not a directory); "
+                    "it can be changed with PODCAST_CTL_DB_PATH."
+                ),
+            ) from exc
         self._configure_connection(conn)
         return conn
 

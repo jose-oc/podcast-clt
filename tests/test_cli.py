@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
-from podcast_ctl import __version__
+from podcast_ctl import __version__, errors
+from podcast_ctl.cli import main as main_module
 from podcast_ctl.cli.main import app
 from podcast_ctl.discovery.itunes import PodcastSearchResult
 from podcast_ctl.discovery.resolver import ResolvedSource
@@ -28,6 +30,12 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db_file = tmp_path / "test_podcast_ctl.db"
     monkeypatch.setenv("PODCAST_CTL_DB_PATH", str(db_file))
     return db_file
+
+
+@pytest.fixture(autouse=True)
+def reset_debug_mode() -> None:
+    """Ensure the global --debug switch never leaks between tests."""
+    errors.set_debug(False)
 
 
 # =============================================================================
@@ -1131,3 +1139,113 @@ def test_transcribe_reports_engine_disabled_mid_batch(tmp_path: Path) -> None:
     assert "disabled for the rest of the batch" in output
     assert "1 remaining episode(s)" in output
     assert "disabled mid-batch after rate limiting" in output
+
+
+# =============================================================================
+# Error Handling UX Tests
+# =============================================================================
+
+
+def _run_entrypoint(monkeypatch: pytest.MonkeyPatch, args: list[str]) -> int:
+    """Invoke the production console-script entry point in-process; return the exit code."""
+    monkeypatch.setattr(sys, "argv", ["podcast-ctl", *args])
+    with pytest.raises(SystemExit) as exc_info:
+        main_module.run()
+    return exc_info.value.code if isinstance(exc_info.value.code, int) else 0
+
+
+def _flat_output(capsys: pytest.CaptureFixture[str]) -> str:
+    """Captured stdout with whitespace collapsed, so rich line-wrapping is harmless."""
+    return " ".join(capsys.readouterr().out.split())
+
+
+def test_help_lists_debug_option() -> None:
+    """The global --debug switch is documented in --help."""
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "--debug" in result.stdout
+
+
+def test_db_path_pointing_to_directory_shows_friendly_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A directory as PODCAST_CTL_DB_PATH prints a short actionable message, not a traceback."""
+    monkeypatch.setenv("PODCAST_CTL_DB_PATH", str(tmp_path))
+    code = _run_entrypoint(monkeypatch, ["cache", "stats"])
+    out = _flat_output(capsys)
+    assert code == 1
+    assert "Cannot open the SQLite database" in out
+    assert "PODCAST_CTL_DB_PATH" in out
+    assert "Traceback" not in out
+
+
+def test_db_path_with_uncreatable_parent_shows_friendly_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unwritable data-directory location prints a short actionable message, not a traceback."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    monkeypatch.setenv("PODCAST_CTL_DB_PATH", str(blocker / "db.sqlite"))
+    code = _run_entrypoint(monkeypatch, ["cache", "stats"])
+    out = _flat_output(capsys)
+    assert code == 1
+    assert "Cannot create the data directory" in out
+    assert "Traceback" not in out
+
+
+def test_unexpected_error_is_summarized_and_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], isolated_db: Path
+) -> None:
+    """An unexpected failure prints a one-line summary and logs the full traceback to the log file."""
+    def boom(self: StorageRepository) -> dict:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(StorageRepository, "get_cache_stats", boom)
+    code = _run_entrypoint(monkeypatch, ["cache", "stats"])
+    out = _flat_output(capsys)
+    assert code == 1
+    assert "Unexpected error: RuntimeError: boom" in out
+    assert "--debug" in out
+    assert "Traceback" not in out
+    log_file = isolated_db.parent / "logs" / "podcast-ctl.log"
+    assert log_file.exists()
+    log_text = log_file.read_text()
+    assert "Traceback" in log_text
+    assert "RuntimeError" in log_text
+
+
+def test_debug_env_var_reraises_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PODCAST_CTL_DEBUG=1 surfaces the full traceback (the exception propagates)."""
+    monkeypatch.setenv("PODCAST_CTL_DEBUG", "1")
+
+    def boom(self: StorageRepository) -> dict:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(StorageRepository, "get_cache_stats", boom)
+    monkeypatch.setattr(sys, "argv", ["podcast-ctl", "cache", "stats"])
+    with pytest.raises(RuntimeError, match="boom"):
+        main_module.run()
+
+
+def test_debug_flag_reraises_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--debug surfaces the full traceback (the exception propagates)."""
+    def boom(self: StorageRepository) -> dict:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(StorageRepository, "get_cache_stats", boom)
+    monkeypatch.setattr(sys, "argv", ["podcast-ctl", "--debug", "cache", "stats"])
+    with pytest.raises(RuntimeError, match="boom"):
+        main_module.run()
+
+
+def test_expected_errors_stay_friendly_in_debug_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Expected/user errors keep the short message even with debug mode on; tracebacks go to the log."""
+    monkeypatch.setenv("PODCAST_CTL_DEBUG", "1")
+    monkeypatch.setenv("PODCAST_CTL_DB_PATH", str(tmp_path))
+    code = _run_entrypoint(monkeypatch, ["cache", "stats"])
+    out = _flat_output(capsys)
+    assert code == 1
+    assert "Cannot open the SQLite database" in out
+    assert "Traceback" not in out
