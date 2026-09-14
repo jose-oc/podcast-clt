@@ -54,12 +54,12 @@ The post-processing layer enhances normalized `TranscriptResult` objects into pu
 
 A pluggable interface allows users to choose between local zero-cost models and cloud APIs:
 
-| Provider | Type | Recommended Models | Use Case |
-| :--- | :--- | :--- | :--- |
-| **Ollama** | Local (Free) | `llama3.1:8b`, `qwen2.5:7b`, `mistral:7b` | Offline, zero-cost processing on Apple Silicon / GPU. |
-| **Groq** | Cloud (Fast) | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | Ultra-fast token generation at fraction of a cent. |
-| **OpenAI** | Cloud | `gpt-4o-mini`, `gpt-4o` | High accuracy structured extraction. |
-| **Anthropic** | Cloud | `claude-3-5-haiku`, `claude-3-5-sonnet` | Long-context podcast processing (up to 200k tokens). |
+| Provider      | Type         | Recommended Models                              | Use Case                                              |
+|:--------------|:-------------|:------------------------------------------------|:------------------------------------------------------|
+| **Ollama**    | Local (Free) | `llama3.1:8b`, `qwen2.5:7b`, `mistral:7b`       | Offline, zero-cost processing on Apple Silicon / GPU. |
+| **Groq**      | Cloud (Fast) | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768` | Ultra-fast token generation at fraction of a cent.    |
+| **OpenAI**    | Cloud        | `gpt-4o-mini`, `gpt-4o`                         | High accuracy structured extraction.                  |
+| **Anthropic** | Cloud        | `claude-3-5-haiku`, `claude-3-5-sonnet`         | Long-context podcast processing (up to 200k tokens).  |
 
 ---
 

@@ -104,12 +104,12 @@ flowchart LR
 
 ### Tier Breakdown
 
-| Tier | Engine | Cost | Speed | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tier 1** | **RSS Podcasting 2.0** | $0.00 | Instant (<1s) | Downloads official publisher transcripts directly from `<podcast:transcript>` tags (SRT, VTT, JSON, Text, HTML). |
-| **Tier 2** | **YouTube Captions** | $0.00 | Instant (1-3s) | Extracts official or auto-generated YouTube subtitles using learned Show $\leftrightarrow$ Channel and Episode $\leftrightarrow$ Video mappings. |
-| **Tier 3** | **Local Whisper** | $0.00 | Moderate (1-5x realtime) | Downloads episode audio stream and transcribes locally using `faster-whisper` (CTranslate2) on Apple Silicon GPU / CUDA / CPU. |
-| **Tier 4** | **Cloud Whisper API** | Pay-as-you-go (~$0.006/min) | Ultra-fast (10-30s) | Transcribes using Groq or OpenAI Whisper APIs when local compute is insufficient or explicitly requested. Guarded by interactive cost confirmation. |
+| Tier       | Engine                 | Cost                        | Speed                    | Description                                                                                                                                         |
+|:-----------|:-----------------------|:----------------------------|:-------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Tier 1** | **RSS Podcasting 2.0** | $0.00                       | Instant (<1s)            | Downloads official publisher transcripts directly from `<podcast:transcript>` tags (SRT, VTT, JSON, Text, HTML).                                    |
+| **Tier 2** | **YouTube Captions**   | $0.00                       | Instant (1-3s)           | Extracts official or auto-generated YouTube subtitles using learned Show $\leftrightarrow$ Channel and Episode $\leftrightarrow$ Video mappings.    |
+| **Tier 3** | **Local Whisper**      | $0.00                       | Moderate (1-5x realtime) | Downloads episode audio stream and transcribes locally using `faster-whisper` (CTranslate2) on Apple Silicon GPU / CUDA / CPU.                      |
+| **Tier 4** | **Cloud Whisper API**  | Pay-as-you-go (~$0.006/min) | Ultra-fast (10-30s)      | Transcribes using Groq or OpenAI Whisper APIs when local compute is insufficient or explicitly requested. Guarded by interactive cost confirmation. |
 
 ---
 
