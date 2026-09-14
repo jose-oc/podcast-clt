@@ -18,6 +18,7 @@ from podcast_ctl.discovery.resolver import ResolvedSource
 from podcast_ctl.discovery.rss import ShowMetadata
 from podcast_ctl.engines.base import TranscriptionEngineError
 from podcast_ctl.engines.channel_search import ChannelVideo
+from podcast_ctl.kb.embeddings import EmbeddingBackendUnavailable, get_embedding_provider
 from podcast_ctl.models.knowledge import ShowMapping
 from podcast_ctl.models.transcript import EpisodeMetadata, TranscriptResult, TranscriptSegment
 from podcast_ctl.storage.repository import StorageRepository
@@ -1253,3 +1254,64 @@ def test_expected_errors_stay_friendly_in_debug_mode(
     assert code == 1
     assert "Cannot open the SQLite database" in out
     assert "Traceback" not in out
+
+
+# =============================================================================
+# Help Examples Tests
+# =============================================================================
+
+HELP_EXAMPLE_COMMANDS = [
+    ["search"],
+    ["inspect"],
+    ["transcribe"],
+    ["cache", "stats"],
+    ["cache", "list"],
+    ["cache", "clean"],
+    ["kb", "build"],
+    ["kb", "embed"],
+    ["kb", "search"],
+    ["kb", "status"],
+    ["mapping", "list"],
+    ["mapping", "sync"],
+    ["mapping", "add"],
+    ["mapping", "add", "show"],
+    ["mapping", "add", "episode"],
+    ["mapping", "remove"],
+    ["mapping", "remove", "show"],
+    ["mapping", "remove", "episode"],
+]
+
+
+@pytest.mark.parametrize("command", HELP_EXAMPLE_COMMANDS, ids=[" ".join(c) for c in HELP_EXAMPLE_COMMANDS])
+def test_command_help_includes_examples(command: list[str]) -> None:
+    """Every command's --help shows a usage Examples section."""
+    result = runner.invoke(app, [*command, "--help"])
+    assert result.exit_code == 0
+    flat = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "Examples:" in flat
+
+
+# =============================================================================
+# Error Hint Tests
+# =============================================================================
+
+
+def test_openai_compatible_provider_error_shows_setup_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing cloud-adapter configuration error says how to fix it."""
+    for var in ("PODCAST_CTL_EMBED_BASE_URL", "PODCAST_CTL_EMBED_API_KEY", "PODCAST_CTL_EMBED_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    with pytest.raises(EmbeddingBackendUnavailable) as exc_info:
+        get_embedding_provider("openai-compatible")
+    message = str(exc_info.value)
+    assert "PODCAST_CTL_EMBED_BASE_URL" in message
+    assert "export PODCAST_CTL_EMBED_BASE_URL" in message
+
+
+def test_unknown_provider_error_shows_fix() -> None:
+    """An unknown provider error names the valid values and how to pass them."""
+    with pytest.raises(EmbeddingBackendUnavailable) as exc_info:
+        get_embedding_provider("no-such-provider")
+    message = str(exc_info.value)
+    assert "local" in message
+    assert "openai-compatible" in message
+    assert "--provider" in message

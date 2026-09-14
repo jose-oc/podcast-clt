@@ -63,7 +63,13 @@ def list_mappings(
         ),
     ] = None,
 ) -> None:
-    """List all stored Show and Episode YouTube mappings."""
+    """List all stored Show and Episode YouTube mappings.
+
+    \b
+    Examples:
+      podcast-ctl mapping list
+      podcast-ctl mapping list --show "Huberman Lab"
+    """
     repo = StorageRepository()
     show_mappings = repo.list_show_mappings()
     episode_mappings = repo.list_episode_mappings(show_id=show)
@@ -123,7 +129,12 @@ def add_show_mapping(
         ),
     ] = None,
 ) -> None:
-    """Add or update a Show <-> YouTube Channel mapping."""
+    """Add or update a Show <-> YouTube Channel mapping.
+
+    \b
+    Examples:
+      podcast-ctl mapping add show <feed_url> <channel_url>
+    """
     repo = StorageRepository()
     show_title = title.strip() if title else None
     if show_title is None:
@@ -224,7 +235,12 @@ def add_episode_mapping(
     ),
     youtube_video_url: str = typer.Argument(..., help="Direct YouTube video URL"),
 ) -> None:
-    """Add or update an Episode <-> YouTube Video mapping."""
+    """Add or update an Episode <-> YouTube Video mapping.
+
+    \b
+    Examples:
+      podcast-ctl mapping add episode "Huberman Lab" "<episode title or RSS GUID>" <video_url>
+    """
     repo = StorageRepository()
     show_key, episode_guid, resolved_title = _resolve_episode_mapping_keys(show_id.strip(), episode_id.strip())
     mapping = KnowledgeLearner.learn_youtube_mapping(
@@ -246,7 +262,12 @@ def add_episode_mapping(
 def remove_show_mapping(
     feed_url: str = typer.Argument(..., help="Podcast RSS feed URL to remove"),
 ) -> None:
-    """Remove a Show <-> YouTube Channel mapping."""
+    """Remove a Show <-> YouTube Channel mapping.
+
+    \b
+    Examples:
+      podcast-ctl mapping remove show <feed_url>
+    """
     repo = StorageRepository()
     deleted = repo.delete_show_mapping(feed_url.strip())
     if deleted:
@@ -260,7 +281,12 @@ def remove_episode_mapping(
     show_id: str = typer.Argument(..., help="Show identifier or title"),
     episode_id: str = typer.Argument(..., help="Episode RSS GUID (as used in 'mapping list')"),
 ) -> None:
-    """Remove an Episode <-> YouTube Video mapping."""
+    """Remove an Episode <-> YouTube Video mapping.
+
+    \b
+    Examples:
+      podcast-ctl mapping remove episode "Huberman Lab" "<episode RSS GUID>"
+    """
     repo = StorageRepository()
     deleted = repo.delete_episode_mapping(show_id.strip(), episode_id.strip())
     if deleted:
@@ -305,9 +331,14 @@ def sync_mappings(
 
     Use this when the per-episode fallback during transcription cannot reach
     an episode: that fallback only searches the 60 most recent channel videos.
+
+    \b
+    Examples:
+      podcast-ctl mapping sync "Huberman Lab"
+      podcast-ctl mapping sync "Huberman Lab" --dry-run --threshold 0.9
     """
     if not 0.0 < threshold <= 1.0:
-        console.error(f"--threshold must be in (0, 1], got {threshold}.")
+        console.error(f"--threshold must be in (0, 1], got {threshold}. For example: --threshold 0.8.")
         raise typer.Exit(code=2)
 
     # 1. Fetch the feed once (search term or feed URL)
@@ -322,7 +353,10 @@ def sync_mappings(
             if not episodes:
                 raise ValueError("no episodes found in the feed")
         except Exception as exc:
-            console.error(f"Could not fetch the feed for '[bold white]{show}[/bold white]': {exc}")
+            console.error(
+                f"Could not fetch the feed for '[bold white]{show}[/bold white]': {exc}. "
+                "Check the show name or feed URL and your network connection."
+            )
             raise typer.Exit(code=1) from exc
 
     canonical_show_id = episodes[0].effective_show_id
@@ -353,7 +387,10 @@ def sync_mappings(
             console.error(f"Could not list the videos of [dim underline]{channel_url}[/dim underline]: {exc}")
             raise typer.Exit(code=1) from exc
     if not videos:
-        console.error(f"No videos found on [dim underline]{channel_url}[/dim underline].")
+        console.error(
+                f"No videos found on [dim underline]{channel_url}[/dim underline]. "
+                "Check the channel URL and that it has public videos."
+            )
         raise typer.Exit(code=1)
 
     # 4. Match every episode locally

@@ -272,9 +272,12 @@ def get_embedding_provider(
         ]
         if missing:
             raise EmbeddingBackendUnavailable(
-                "The openai-compatible provider needs these environment variables: " + ", ".join(missing)
+                "The openai-compatible provider needs these environment variables: " + ", ".join(missing) + ".\n"
+                "Set them and retry, e.g. export PODCAST_CTL_EMBED_BASE_URL=http://localhost:11434/v1 "
+                "(see docs/KNOWLEDGE_BASE.md)."
             )
         return OpenAICompatibleProvider(base_url=base_url, api_key=api_key, model=model_name)
     raise EmbeddingBackendUnavailable(
-        f"Unknown embedding provider '{name}'. Available: {PROVIDER_LOCAL}, {PROVIDER_OPENAI_COMPATIBLE}."
+        f"Unknown embedding provider '{name}'. Available: {PROVIDER_LOCAL}, {PROVIDER_OPENAI_COMPATIBLE}. "
+        "Pass one of them to --provider, or omit it for the default local backend."
     )
