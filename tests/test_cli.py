@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -1163,7 +1164,10 @@ def test_help_lists_debug_option() -> None:
     """The global --debug switch is documented in --help."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "--debug" in result.stdout
+    # Strip ANSI styling and whitespace: rich may fold long table cells in
+    # narrow environments (CI), splitting "--debug" across lines.
+    flat = re.sub(r"\s+", "", re.sub(r"\x1b\[[0-9;]*m", "", result.stdout))
+    assert "--debug" in flat
 
 
 def test_db_path_pointing_to_directory_shows_friendly_error(
