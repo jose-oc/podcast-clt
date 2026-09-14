@@ -125,7 +125,12 @@ class SentenceTransformerProvider:
         # available, cpu otherwise); an explicit value is passed through.
         self._st = SentenceTransformer(model, device=requested)
         self._device = str(self._st.device)
-        self._dims = int(self._st.get_sentence_embedding_dimension() or 0)
+        # sentence-transformers 6.x renamed get_sentence_embedding_dimension
+        # to get_embedding_dimension; use whichever the installed version has.
+        get_dims = getattr(self._st, "get_embedding_dimension", None)
+        if get_dims is None:  # sentence-transformers < 6
+            get_dims = self._st.get_sentence_embedding_dimension
+        self._dims = int(get_dims() or 0)
 
     @property
     def device(self) -> str:
