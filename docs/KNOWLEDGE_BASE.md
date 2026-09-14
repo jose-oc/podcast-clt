@@ -153,7 +153,7 @@ export PODCAST_CTL_EMBED_BASE_URL=http://localhost:11434/v1
 export PODCAST_CTL_EMBED_API_KEY=ollama
 
 podcast-ctl kb embed --provider local --reindex
-podcast-ctl kb embed --provider openai-compatible --reindex   # after a backup
+podcast-ctl kb embed --provider openai-compatible --reindex   # after a backup of kb database if you want to keep previous vectors
 ```
 
 Note the two variables hold different kinds of names: the local one is a
