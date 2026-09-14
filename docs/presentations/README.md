@@ -4,10 +4,10 @@ Slide decks for talks and videos about `podcast-ctl`, written in
 [Marp](https://marp.app/) Markdown — plain text, versioned in Git, renderable
 to HTML, PDF, PPTX, or images.
 
-| Deck | Language |
-| :--- | :--- |
-| [`cli-tour-en.md`](cli-tour-en.md) | English |
-| [`cli-tour-es.md`](cli-tour-es.md) | Español |
+| Deck                               | Language |
+|:-----------------------------------|:---------|
+| [`cli-tour-en.md`](cli-tour-en.md) | English  |
+| [`cli-tour-es.md`](cli-tour-es.md) | Español  |
 
 The decks cover only what is merged in `main`. When a release adds user-facing
 features (e.g. embedding-based hybrid search), extend both decks together.

@@ -166,12 +166,12 @@ pipeline_version: 1
 
 ## Incremental delivery plan
 
-| Phase | Ships | Value |
-|---|---|---|
-| 2a | Post-processing → per-episode MD + INDEX.md | Browsable KB, paste-into-chat usable |
-| 2b | `kb build` chunking + FTS5 lexical search | "What did they say about X?" with [Episode @ mm:ss] citations |
-| 2c | sqlite-vec embeddings (local) + RRF hybrid | Paraphrase/concept queries work |
-| 2d | Golden-query eval harness + CI regression gate | Changes are measured, not vibes |
+| Phase | Ships                                          | Value                                                         |
+|-------|------------------------------------------------|---------------------------------------------------------------|
+| 2a    | Post-processing → per-episode MD + INDEX.md    | Browsable KB, paste-into-chat usable                          |
+| 2b    | `kb build` chunking + FTS5 lexical search      | "What did they say about X?" with [Episode @ mm:ss] citations |
+| 2c    | sqlite-vec embeddings (local) + RRF hybrid     | Paraphrase/concept queries work                               |
+| 2d    | Golden-query eval harness + CI regression gate | Changes are measured, not vibes                               |
 
 Recommendation: implement 2a+2b together (they are small, and 2b is where the
 KB becomes actually useful), then 2c, then 2d alongside.

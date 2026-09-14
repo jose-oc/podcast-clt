@@ -126,14 +126,14 @@ Every hit cites `[Episode @ mm:ss]` so you can jump back to the audio. See the [
 
 ## CLI Overview
 
-| Command | Usage | Description |
-| :--- | :--- | :--- |
-| `search` | `podcast-ctl search <query>` | Search Apple Podcasts catalog for shows and feeds. |
-| `inspect` | `podcast-ctl inspect <input>` | Pre-flight inspection & tier breakdown without transcribing. |
-| `transcribe` | `podcast-ctl transcribe <input>` | Transcribe episodes with multi-tier fallback and multi-format export. |
-| `mapping` | `podcast-ctl mapping [list\|add\|remove]` | Manage learned Show $\leftrightarrow$ YouTube associations. |
-| `cache` | `podcast-ctl cache [stats\|list\|clean]` | Inspect and manage SQLite database and transcript cache. |
-| `kb` | `podcast-ctl kb [build\|embed\|search\|status]` | Build and query the knowledge base derived from cached transcripts. |
+| Command      | Usage                                           | Description                                                           |
+|:-------------|:------------------------------------------------|:----------------------------------------------------------------------|
+| `search`     | `podcast-ctl search <query>`                    | Search Apple Podcasts catalog for shows and feeds.                    |
+| `inspect`    | `podcast-ctl inspect <input>`                   | Pre-flight inspection & tier breakdown without transcribing.          |
+| `transcribe` | `podcast-ctl transcribe <input>`                | Transcribe episodes with multi-tier fallback and multi-format export. |
+| `mapping`    | `podcast-ctl mapping [list\|add\|remove]`       | Manage learned Show $\leftrightarrow$ YouTube associations.           |
+| `cache`      | `podcast-ctl cache [stats\|list\|clean]`        | Inspect and manage SQLite database and transcript cache.              |
+| `kb`         | `podcast-ctl kb [build\|embed\|search\|status]` | Build and query the knowledge base derived from cached transcripts.   |
 
 For detailed documentation on flags, options, and advanced configurations, see the [CLI Reference](docs/CLI_REFERENCE.md).
 

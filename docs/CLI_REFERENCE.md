@@ -10,12 +10,12 @@ Comprehensive command-line reference and usage guide for `podcast-ctl`.
 podcast-ctl [OPTIONS] COMMAND [ARGS]...
 ```
 
-| Flag | Short | Description |
-| :--- | :--- | :--- |
-| `--version` | `-v` | Display `podcast-ctl` version and exit. |
-| `--verbose` | | Enable verbose debug logging output on the console. |
-| `--log-file` | | Custom log file path (see [Logging](#logging)). |
-| `--help` | | Show help message and exit. |
+| Flag         | Short | Description                                         |
+|:-------------|:------|:----------------------------------------------------|
+| `--version`  | `-v`  | Display `podcast-ctl` version and exit.             |
+| `--verbose`  |       | Enable verbose debug logging output on the console. |
+| `--log-file` |       | Custom log file path (see [Logging](#logging)).     |
+| `--help`     |       | Show help message and exit.                         |
 
 ---
 
@@ -328,21 +328,21 @@ Every run appends INFO-level diagnostics (engine attempts, cache hits, channel s
 
 ## Environment Variables
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `PODCAST_CTL_DB_PATH` | Custom path to SQLite database file. | `~/.local/share/podcast-ctl/podcast_ctl.db` |
-| `PODCAST_CTL_KB_DIR` | Custom path to the knowledge base directory. | `kb/` next to the catalog DB |
-| `PODCAST_CTL_EMBED_MODEL` | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3` |
-| `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API. | None |
-| `PODCAST_CTL_EMBED_API_KEY` | API key for the KB cloud embedding adapter. | None |
-| `GROQ_API_KEY` | API key for Groq Cloud Whisper API. | None |
-| `OPENAI_API_KEY` | API key for OpenAI Whisper API. | None |
+| Variable                     | Description                                                       | Default                                     |
+|:-----------------------------|:------------------------------------------------------------------|:--------------------------------------------|
+| `PODCAST_CTL_DB_PATH`        | Custom path to SQLite database file.                              | `~/.local/share/podcast-ctl/podcast_ctl.db` |
+| `PODCAST_CTL_KB_DIR`         | Custom path to the knowledge base directory.                      | `kb/` next to the catalog DB                |
+| `PODCAST_CTL_EMBED_MODEL`    | KB embedding model (local provider default, or cloud model name). | `BAAI/bge-m3`                               |
+| `PODCAST_CTL_EMBED_BASE_URL` | Base URL of an OpenAI-compatible embeddings API.                  | None                                        |
+| `PODCAST_CTL_EMBED_API_KEY`  | API key for the KB cloud embedding adapter.                       | None                                        |
+| `GROQ_API_KEY`               | API key for Groq Cloud Whisper API.                               | None                                        |
+| `OPENAI_API_KEY`             | API key for OpenAI Whisper API.                                   | None                                        |
 
 ---
 
 ## Exit Codes
 
-| Code | Meaning |
-| :--- | :--- |
-| `0` | Success / Normal exit / User cancelled gracefully. |
-| `1` | Error encountered (invalid arguments, transcription failure, etc.). |
+| Code | Meaning                                                             |
+|:-----|:--------------------------------------------------------------------|
+| `0`  | Success / Normal exit / User cancelled gracefully.                  |
+| `1`  | Error encountered (invalid arguments, transcription failure, etc.). |
